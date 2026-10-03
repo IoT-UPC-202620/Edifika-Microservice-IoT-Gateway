@@ -5,7 +5,7 @@ from flask.views import MethodView
 from flask_smorest import Blueprint
 
 from ..security import require_token
-from .schemas import DeviceCreateSchema, DeviceSchema
+from .schemas import DeviceCreateSchema, DeviceSchema, DeviceSettingsSchema
 
 blp = Blueprint("devices", __name__, url_prefix="/api/v1/devices", description="Node registry")
 
@@ -39,3 +39,13 @@ class DeviceItem(MethodView):
     def get(self, device_id):
         """Get one node."""
         return _devices().require(device_id)
+
+
+@blp.route("/<device_id>/settings")
+class DeviceSettings(MethodView):
+    @require_token
+    @blp.arguments(DeviceSettingsSchema)
+    @blp.response(200, DeviceSchema)
+    def patch(self, body, device_id):
+        """Calibrate a node: tank height, low humidity and critical level thresholds."""
+        return _devices().update_settings(device_id, body)

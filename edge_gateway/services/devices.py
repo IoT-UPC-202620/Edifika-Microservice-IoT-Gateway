@@ -57,6 +57,25 @@ class DeviceService:
             raise NotFoundError("Device not found")
         return device
 
+    def update_settings(self, device_id: str, patch: dict) -> Device:
+        """Calibrate a node (tank height, thresholds). Only known keys inside their limits are kept."""
+        from .telemetry import SETTING_LIMITS
+
+        device = self.require(device_id)
+        for key, value in patch.items():
+            if key not in SETTING_LIMITS:
+                raise ValidationFailed(f"Unknown setting: {key}")
+            low, high = SETTING_LIMITS[key]
+            if not low <= value <= high:
+                raise ValidationFailed(f"{key} must be between {low} and {high}")
+        merged = {**device.settings, **patch}
+        device.config = json.dumps(merged)
+        device.save()
+        self.outbox.enqueue(
+            ob.DEVICE_STATUS, {"deviceId": device_id, "event": "settings_updated", "settings": merged}
+        )
+        return device
+
     def list_all(self) -> list[Device]:
         return list(Device.select().order_by(Device.device_id))
 
