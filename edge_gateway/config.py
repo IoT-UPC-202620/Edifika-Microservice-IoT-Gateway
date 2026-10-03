@@ -40,6 +40,7 @@ class Config:
     # Behaviour
     heartbeat_timeout_s: int = 30
     ack_timeout_s: float = 3.0
+    remote_command_timeout_s: float = 5.0
     dedupe_window_s: float = 2.0
     lock_open_ms: int = 5000
     clock_drift_s: int = 2

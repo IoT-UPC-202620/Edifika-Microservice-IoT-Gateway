@@ -11,6 +11,7 @@ from .services.commands import CommandService
 from .services.credentials import CredentialService
 from .services.devices import DeviceService
 from .services.outbox import OutboxForwarder, OutboxService
+from .services.remote import RemoteCommandService
 from .services.sync import SyncService
 from .services.telemetry import TelemetryService
 
@@ -28,6 +29,7 @@ class Gateway:
         self.alerts = AlertService(self.clock, self.outbox)
         self.commands = CommandService(config, self.clock, self.publisher, self.outbox)
         self.devices = DeviceService(config, self.clock, self.commands, self.outbox, self.alerts)
+        self.remote = RemoteCommandService(config, self.devices, self.commands, self.outbox)
         self.credentials = CredentialService(self.clock, self.outbox)
         self.access = AccessService(config, self.clock, self.devices, self.commands, self.outbox)
         self.telemetry = TelemetryService(
@@ -63,6 +65,7 @@ class Gateway:
     def housekeeping(self) -> None:
         """Time-driven local checks: silent nodes, unanswered commands and a stale cache."""
         self.devices.check_offline()
+        self.devices.expire_maintenance()
         self.commands.check_timeouts()
         self.sync.check_staleness()
 
