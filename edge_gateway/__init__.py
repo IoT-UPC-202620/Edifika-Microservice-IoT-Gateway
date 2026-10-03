@@ -13,7 +13,7 @@ __version__ = "0.1.0"
 logger = logging.getLogger(__name__)
 
 
-def create_app(config: Config | None = None, *, clock=None) -> Flask:
+def create_app(config: Config | None = None, *, clock=None, cloud=None) -> Flask:
     """Application factory.
 
     Fails fast with a clear message when a required setting is missing.
@@ -41,8 +41,10 @@ def create_app(config: Config | None = None, *, clock=None) -> Flask:
 
     db.init_database(config.database_path)
     app.extensions["health_probes"]["database"] = db.probe
-    gateway = Gateway(config, clock=clock)
+    gateway = Gateway(config, clock=clock, cloud=cloud)
     app.extensions["gateway"] = gateway
+    app.extensions["health_probes"]["outbox"] = gateway.outbox_probe
+    app.extensions["health_probes"]["cache"] = gateway.cache_probe
 
     if config.mqtt_enabled:
         from .mqtt.bridge import MqttBridge
