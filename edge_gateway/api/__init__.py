@@ -6,10 +6,11 @@ from ..services.errors import DomainError
 
 
 def register_blueprints(api) -> None:
-    from . import devices, health
+    from . import access, devices, health
 
     api.register_blueprint(health.blp)
     api.register_blueprint(devices.blp)
+    api.register_blueprint(access.blp)
 
 
 def register_error_handlers(app) -> None:

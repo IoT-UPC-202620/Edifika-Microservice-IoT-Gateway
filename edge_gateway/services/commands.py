@@ -15,12 +15,18 @@ logger = logging.getLogger(__name__)
 LOCK_COMMANDS = ("access_result", "unlock")
 
 
+def expects_lock_movement(type_: str, params: dict) -> bool:
+    """True when the command asks the node to energise the lock."""
+    return type_ in LOCK_COMMANDS and params.get("result", "GRANTED") == "GRANTED"
+
+
 @dataclass
 class Pending:
     command_id: str
     device_id: str
     type: str
     deadline: object
+    lock: bool = False  # the lock is expected to move, so a missing ack is a lock failure
     waiting: bool = False  # a REST caller is waiting for the ack and owns the timeout
     event: threading.Event = field(default_factory=threading.Event)
     status: str | None = None
@@ -92,6 +98,7 @@ class CommandService:
             device_id=device_id,
             type=type_,
             deadline=now + timedelta(seconds=self.config.ack_timeout_s),
+            lock=expects_lock_movement(type_, params or {}),
             waiting=waiting,
         )
         self.pending.add(pending)
@@ -142,7 +149,7 @@ class CommandService:
                     "status": "TIMEOUT",
                 },
             )
-            if pending.type in LOCK_COMMANDS:
+            if pending.lock:
                 self.outbox.enqueue(
                     ob.ALERT,
                     {"alert": "lock_unresponsive", "state": "raised", "deviceId": pending.device_id},
