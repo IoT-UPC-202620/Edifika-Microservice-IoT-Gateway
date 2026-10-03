@@ -1,0 +1,93 @@
+# Local stack for study: MQTT broker + Edge Gateway + a fake cloud backend.
+# Add the node simulators with:  docker compose --profile sim up --build
+
+x-gateway-image: &gateway-image
+  build: .
+  image: edifika/edge-gateway:dev
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 3 > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mock-cloud:
+    <<: *gateway-image
+    command: ["gunicorn", "--bind", "0.0.0.0:9000", "--workers", "1", "mock_cloud.app:app"]
+    environment:
+      MOCK_CLOUD_TOKEN: ${CLOUD_TOKEN:-dev-cloud-token}
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  edge-gateway:
+    <<: *gateway-image
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      mock-cloud:
+        condition: service_healthy
+    environment:
+      EDGE_GATEWAY_ID: ${GATEWAY_ID:-edge-gateway-01}
+      EDGE_SERVICE_TOKEN: ${SERVICE_TOKEN:-dev-service-token}
+      EDGE_DATABASE_PATH: /data/edge-gateway.db
+      EDGE_MQTT_HOST: mosquitto
+      EDGE_MQTT_PORT: "1883"
+      EDGE_CLOUD_BASE_URL: http://mock-cloud:9000
+      EDGE_CLOUD_TOKEN: ${CLOUD_TOKEN:-dev-cloud-token}
+      EDGE_TIMEZONE: ${TIMEZONE:-America/Lima}
+    ports:
+      - "8000:8000"
+    volumes:
+      - edge-data:/data
+    restart: unless-stopped
+
+  # --- optional: virtual ESP32 nodes (profile "sim") ---------------------------------------
+  seed:
+    <<: *gateway-image
+    profiles: ["sim"]
+    command: ["python", "-m", "simulator", "seed"]
+    depends_on:
+      edge-gateway:
+        condition: service_healthy
+    environment: &sim-env
+      SIM_MQTT_HOST: mosquitto
+      SIM_GATEWAY_URL: http://edge-gateway:8000
+      SIM_SERVICE_TOKEN: ${SERVICE_TOKEN:-dev-service-token}
+    restart: "no"
+
+  sim-door:
+    <<: *gateway-image
+    profiles: ["sim"]
+    command: ["python", "-m", "simulator", "run", "--device", "esp32-door-01"]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment: *sim-env
+
+  sim-garden:
+    <<: *gateway-image
+    profiles: ["sim"]
+    command: ["python", "-m", "simulator", "run", "--device", "esp32-garden-01"]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment: *sim-env
+
+volumes:
+  edge-data:
+  mosquitto-data:
