@@ -12,7 +12,7 @@ __version__ = "0.1.0"
 logger = logging.getLogger(__name__)
 
 
-def create_app(config: Config | None = None) -> Flask:
+def create_app(config: Config | None = None, *, clock=None) -> Flask:
     """Application factory.
 
     Fails fast with a clear message when a required setting is missing.
@@ -34,6 +34,19 @@ def create_app(config: Config | None = None) -> Flask:
     )
     app.json.sort_keys = False
     app.extensions["health_probes"] = {}
+
+    from . import db
+    from .gateway import Gateway
+
+    db.init_database(config.database_path)
+    app.extensions["health_probes"]["database"] = db.probe
+    gateway = Gateway(config, clock=clock)
+    app.extensions["gateway"] = gateway
+
+    @app.teardown_appcontext
+    def _close_connection(_exc):
+        if not db.database.is_closed():
+            db.database.close()
 
     api = Api(app)
     api.spec.components.security_scheme(
