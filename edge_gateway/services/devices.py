@@ -128,6 +128,68 @@ class DeviceService:
             )
         return [d.device_id for d in silent]
 
+    # --- maintenance (US89) -------------------------------------------------------
+    def set_maintenance(self, device_id: str, enabled: bool, minutes: int | None = None, actor: str = "api") -> Device:
+        """Deactivate a node for service work, or return it to operation.
+
+        While in maintenance the node ignores cards, readings and commands and raises no alerts.
+        """
+        device = self.require(device_id)
+        now = self.clock.now()
+        if enabled:
+            minutes = minutes or 120
+            if not 1 <= minutes <= self.config.max_maintenance_minutes:
+                raise ValidationFailed(
+                    f"Duration must be between 1 and {self.config.max_maintenance_minutes} minutes"
+                )
+            if device.status != MAINTENANCE:
+                device.maintenance_since = now
+            device.status = MAINTENANCE
+            device.maintenance_until = now + timedelta(minutes=minutes)
+            device.save()
+            self.commands.pending.discard_device(device_id)
+            self._notify_maintenance(device, active=True)
+            self.outbox.enqueue(
+                ob.DEVICE_STATUS,
+                {"deviceId": device_id, "event": "maintenance_started", "by": actor,
+                 "until": to_iso(device.maintenance_until)},
+            )
+            return device
+
+        if device.status != MAINTENANCE:
+            raise ConflictError("The device is not in maintenance")
+        duration = (now - device.maintenance_since).total_seconds() if device.maintenance_since else 0
+        device.maintenance_since = None
+        device.maintenance_until = None
+        recent = device.last_seen and now - device.last_seen <= timedelta(seconds=self.config.heartbeat_timeout_s)
+        device.status = ACTIVE if recent else (OFFLINE if device.last_seen else INACTIVE)
+        device.save()
+        if device.status == OFFLINE:
+            self.alerts.raise_alert(device_id, "device_offline", {"lastSeen": to_iso(device.last_seen)})
+        self._notify_maintenance(device, active=False)
+        self.outbox.enqueue(
+            ob.DEVICE_STATUS,
+            {"deviceId": device_id, "event": "maintenance_ended", "by": actor, "durationSeconds": round(duration)},
+        )
+        return device
+
+    def expire_maintenance(self, now=None) -> list[str]:
+        """End maintenance windows whose time is up."""
+        now = now or self.clock.now()
+        due = list(Device.select().where(Device.status == MAINTENANCE, Device.maintenance_until <= now))
+        for device in due:
+            self.set_maintenance(device.device_id, False, actor="system:expired")
+        return [d.device_id for d in due]
+
+    def _notify_maintenance(self, device: Device, active: bool) -> None:
+        params = {"active": active}
+        if active:
+            params["message"] = "Under maintenance"
+        try:
+            self.commands.send(device.device_id, "maintenance", params)
+        except Exception:
+            logger.exception("Could not notify %s about maintenance=%s", device.device_id, active)
+
     # --- clock --------------------------------------------------------------------
     def _sync_clock_if_drifted(self, device: Device, node_ts: float) -> None:
         now = self.clock.now()

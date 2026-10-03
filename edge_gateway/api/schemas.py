@@ -90,3 +90,20 @@ class ReadingSchema(Schema):
     levelPct = fields.Float(attribute="derived", allow_none=True)
     valid = fields.Boolean()
     capturedAt = IsoDateTime(attribute="captured_at")
+
+
+class MaintenanceSchema(Schema):
+    enabled = fields.Boolean(required=True)
+    durationMinutes = fields.Integer(load_default=None, allow_none=True, validate=validate.Range(min=1, max=1440))
+    requestedBy = fields.String(load_default="api")
+
+
+class CommandRequestSchema(Schema):
+    type = fields.String(required=True, validate=validate.OneOf(["unlock", "display", "buzzer"]))
+    params = fields.Dict(load_default=dict)
+    requestedBy = fields.String(load_default="api")
+
+
+class CommandResultSchema(Schema):
+    commandId = fields.String()
+    status = fields.String()

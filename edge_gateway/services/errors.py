@@ -32,3 +32,8 @@ class DeviceUnavailable(ConflictError):
 class CommandNotConfirmed(DomainError):
     status = 504
     status_name = "Gateway Timeout"
+
+
+class BrokerUnavailable(DomainError):
+    status = 503
+    status_name = "Service Unavailable"
