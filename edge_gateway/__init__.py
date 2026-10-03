@@ -64,7 +64,14 @@ def create_app(config: Config | None = None, *, clock=None) -> Flask:
         "BearerAuth", {"type": "http", "scheme": "bearer"}
     )
 
-    from .api import register_blueprints
+    api.spec.options["security"] = [{"BearerAuth": []}]
+
+    from .api import register_blueprints, register_error_handlers
 
     register_blueprints(api)
+    register_error_handlers(app)
+
+    if config.background_enabled:
+        gateway.start_background()
+        atexit.register(gateway.stop_background)
     return app
