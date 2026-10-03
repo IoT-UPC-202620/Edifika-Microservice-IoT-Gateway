@@ -1,5 +1,6 @@
 """Edifika Edge Gateway: transports data between the IoT nodes and the cloud backend."""
 
+import atexit
 import logging
 
 from flask import Flask
@@ -42,6 +43,16 @@ def create_app(config: Config | None = None, *, clock=None) -> Flask:
     app.extensions["health_probes"]["database"] = db.probe
     gateway = Gateway(config, clock=clock)
     app.extensions["gateway"] = gateway
+
+    if config.mqtt_enabled:
+        from .mqtt.bridge import MqttBridge
+
+        bridge = MqttBridge(config, gateway.router)
+        gateway.use_publisher(bridge)
+        app.extensions["mqtt_bridge"] = bridge
+        app.extensions["health_probes"]["mqtt"] = bridge.probe
+        bridge.start()
+        atexit.register(bridge.stop)
 
     @app.teardown_appcontext
     def _close_connection(_exc):
