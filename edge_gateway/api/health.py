@@ -8,6 +8,7 @@ blp = Blueprint("health", __name__, description="Gateway health")
 
 @blp.route("/health")
 class Health(MethodView):
+    @blp.doc(security=[])
     @blp.response(200)
     def get(self):
         """Report the service status and its dependencies."""

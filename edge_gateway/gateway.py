@@ -3,8 +3,10 @@
 from .clock import SystemClock
 from .mqtt.bridge import LoggingPublisher, PublisherRef
 from .mqtt.router import MessageRouter
+from .scheduler import Scheduler
 from .services.alerts import AlertService
 from .services.commands import CommandService
+from .services.devices import DeviceService
 from .services.outbox import OutboxService
 
 
@@ -17,9 +19,13 @@ class Gateway:
         self.outbox = OutboxService(config, self.clock)
         self.alerts = AlertService(self.clock, self.outbox)
         self.commands = CommandService(config, self.clock, self.publisher, self.outbox)
+        self.devices = DeviceService(config, self.clock, self.commands, self.outbox, self.alerts)
 
         self.router = MessageRouter(config.mqtt_topic_prefix, on_rejected=self._on_rejected)
+        self.router.register("heartbeat", self.devices.on_heartbeat)
         self.router.register("ack", self.commands.handle_ack)
+
+        self.scheduler: Scheduler | None = None
 
     def use_publisher(self, publisher) -> None:
         self.publisher.target = publisher
@@ -28,3 +34,17 @@ class Gateway:
         # A node speaking an unknown schema version is reported once, not per message.
         if err.code == "unsupported_version" and err.device_id:
             self.alerts.raise_alert(err.device_id, "firmware_incompatible")
+
+    # --- background work ----------------------------------------------------------
+    def housekeeping(self) -> None:
+        """Time-driven checks: silent nodes and unanswered commands."""
+        self.devices.check_offline()
+        self.commands.check_timeouts()
+
+    def start_background(self) -> None:
+        self.scheduler = Scheduler([("housekeeping", 1.0, self.housekeeping)])
+        self.scheduler.start()
+
+    def stop_background(self) -> None:
+        if self.scheduler:
+            self.scheduler.stop()
