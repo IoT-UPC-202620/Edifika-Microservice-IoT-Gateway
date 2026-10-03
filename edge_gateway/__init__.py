@@ -3,7 +3,7 @@
 import atexit
 import logging
 
-from flask import Flask
+from flask import Flask, g
 from flask_smorest import Api
 
 from .config import Config
@@ -54,10 +54,17 @@ def create_app(config: Config | None = None, *, clock=None) -> Flask:
         bridge.start()
         atexit.register(bridge.stop)
 
-    @app.teardown_appcontext
+    @app.before_request
+    def _open_connection():
+        # Nested contexts are safe: the connection closes only when the outermost one exits.
+        g.db_context = db.database.connection_context()
+        g.db_context.__enter__()
+
+    @app.teardown_request
     def _close_connection(_exc):
-        if not db.database.is_closed():
-            db.database.close()
+        context = g.pop("db_context", None)
+        if context is not None:
+            context.__exit__(None, None, None)
 
     api = Api(app)
     api.spec.components.security_scheme(

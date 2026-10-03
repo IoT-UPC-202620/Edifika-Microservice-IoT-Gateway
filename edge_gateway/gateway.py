@@ -4,8 +4,10 @@ from .clock import SystemClock
 from .mqtt.bridge import LoggingPublisher, PublisherRef
 from .mqtt.router import MessageRouter
 from .scheduler import Scheduler
+from .services.access import AccessService
 from .services.alerts import AlertService
 from .services.commands import CommandService
+from .services.credentials import CredentialService
 from .services.devices import DeviceService
 from .services.outbox import OutboxService
 
@@ -20,9 +22,12 @@ class Gateway:
         self.alerts = AlertService(self.clock, self.outbox)
         self.commands = CommandService(config, self.clock, self.publisher, self.outbox)
         self.devices = DeviceService(config, self.clock, self.commands, self.outbox, self.alerts)
+        self.credentials = CredentialService(self.clock, self.outbox)
+        self.access = AccessService(config, self.clock, self.devices, self.commands, self.outbox)
 
         self.router = MessageRouter(config.mqtt_topic_prefix, on_rejected=self._on_rejected)
         self.router.register("heartbeat", self.devices.on_heartbeat)
+        self.router.register("access", self.access.on_access)
         self.router.register("ack", self.commands.handle_ack)
 
         self.scheduler: Scheduler | None = None
