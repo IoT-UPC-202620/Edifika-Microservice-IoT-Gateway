@@ -10,6 +10,7 @@ from .services.commands import CommandService
 from .services.credentials import CredentialService
 from .services.devices import DeviceService
 from .services.outbox import OutboxService
+from .services.telemetry import TelemetryService
 
 
 class Gateway:
@@ -24,10 +25,14 @@ class Gateway:
         self.devices = DeviceService(config, self.clock, self.commands, self.outbox, self.alerts)
         self.credentials = CredentialService(self.clock, self.outbox)
         self.access = AccessService(config, self.clock, self.devices, self.commands, self.outbox)
+        self.telemetry = TelemetryService(
+            config, self.clock, self.devices, self.commands, self.outbox, self.alerts
+        )
 
         self.router = MessageRouter(config.mqtt_topic_prefix, on_rejected=self._on_rejected)
         self.router.register("heartbeat", self.devices.on_heartbeat)
         self.router.register("access", self.access.on_access)
+        self.router.register("readings", self.telemetry.on_reading)
         self.router.register("ack", self.commands.handle_ack)
 
         self.scheduler: Scheduler | None = None

@@ -79,3 +79,27 @@ class AttemptSchema(Schema):
 
     def masked_credential(self, obj):
         return mask(obj.credential)
+
+
+class DeviceSettingsSchema(Schema):
+    humidity_low_pct = fields.Float(validate=validate.Range(min=0, max=100))
+    tank_height_cm = fields.Float(validate=validate.Range(min=10, max=400))
+    critical_level_pct = fields.Float(validate=validate.Range(min=0, max=100))
+    hysteresis_pct = fields.Float(validate=validate.Range(min=0, max=50))
+
+
+class ReadingQuerySchema(Schema):
+    deviceId = fields.String(load_default=None)
+    sensor = fields.String(load_default=None, validate=validate.OneOf(["humidity", "ultrasonic"]))
+    includeInvalid = fields.Boolean(load_default=False)
+    limit = fields.Integer(load_default=100, validate=validate.Range(min=1, max=1000))
+
+
+class ReadingSchema(Schema):
+    deviceId = fields.String(attribute="device_id")
+    sensor = fields.String()
+    value = fields.Float()
+    unit = fields.String()
+    levelPct = fields.Float(attribute="derived", allow_none=True)
+    valid = fields.Boolean()
+    capturedAt = IsoDateTime(attribute="captured_at")
