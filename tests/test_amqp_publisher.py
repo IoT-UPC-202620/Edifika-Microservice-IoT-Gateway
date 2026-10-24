@@ -169,7 +169,8 @@ def test_envelope_follows_contract():
 
 
 @pytest.mark.skipif(
-    not PLATFORM_CONTRACTS.exists(), reason="Edifika-IoT-Platform contracts not present"
+    not (PLATFORM_CONTRACTS / "envelope.schema.json").exists(),
+    reason="Edifika-IoT-Platform contracts not present",
 )
 @pytest.mark.parametrize(
     "kind",
@@ -185,10 +186,9 @@ def test_envelope_follows_contract():
 def test_envelope_validates_against_platform_schema(kind):
     import jsonschema
 
-    schema_file = PLATFORM_CONTRACTS / f"{kind.replace('_', '-')}.json"
-    if not schema_file.exists():
-        schema_file = PLATFORM_CONTRACTS / "envelope.json"
-    schema = json.loads(schema_file.read_text())
+    env_schema = json.loads(
+        (PLATFORM_CONTRACTS / "envelope.schema.json").read_text(encoding="utf-8")
+    )
     payloads = {
         "access_attempt": {
             "deviceId": "esp32-acc-01",
@@ -239,7 +239,14 @@ def test_envelope_validates_against_platform_schema(kind):
         },
         "edge-gateway-01",
     )
-    jsonschema.validate(json.loads(body), schema)
+    envelope_data = json.loads(body)
+    jsonschema.validate(envelope_data, env_schema)
+
+    event_type = "".join(part.capitalize() for part in kind.split("_"))
+    payload_schema_file = PLATFORM_CONTRACTS / "payloads" / f"{event_type}.schema.json"
+    if payload_schema_file.exists():
+        payload_schema = json.loads(payload_schema_file.read_text(encoding="utf-8"))
+        jsonschema.validate(envelope_data["payload"], payload_schema)
 
 
 def test_publishes_with_confirms_and_mandatory(fake_conn):
