@@ -1,3 +1,4 @@
+from dataclasses import replace
 import json
 
 import pytest
@@ -109,6 +110,7 @@ class StubClient:
     def __init__(self):
         self.published = []
         self.subscribed = []
+        self.tls_calls = []
         self.rc = 0
 
     def username_pw_set(self, *a): ...
@@ -117,6 +119,9 @@ class StubClient:
     def loop_start(self): ...
     def loop_stop(self): ...
     def disconnect(self): ...
+    def tls_set(self, **kw):
+        self.tls_calls.append(kw)
+    def tls_insecure_set(self, *a, **kw): ...
 
     def subscribe(self, topic, qos=0):
         self.subscribed.append(topic)
@@ -124,6 +129,22 @@ class StubClient:
     def publish(self, topic, payload, qos=0):
         self.published.append((topic, json.loads(payload)))
         return type("Info", (), {"rc": self.rc})()
+
+
+def router():
+    return MessageRouter(PREFIX)
+
+
+def test_bridge_enables_tls_with_ca_file(config):
+    stub = StubClient()
+    MqttBridge(replace(config, mqtt_enabled=True, mqtt_tls=True, mqtt_ca_file="ca.pem"), router(), client_factory=lambda: stub)
+    assert stub.tls_calls == [{"ca_certs": "ca.pem"}]
+
+
+def test_bridge_uses_system_cas_without_ca_file(config):
+    stub = StubClient()
+    MqttBridge(replace(config, mqtt_enabled=True, mqtt_tls=True), router(), client_factory=lambda: stub)
+    assert stub.tls_calls == [{"ca_certs": None}]
 
 
 def make_bridge(router=None):
