@@ -1,11 +1,12 @@
 """ESP32 node simulator: lets you exercise the Edge Gateway without hardware.
 
     python -m simulator seed                              register the demo nodes in the gateway
-    python -m simulator run --device esp32-garden-01      heartbeat + sensor readings, acks commands
-    python -m simulator tap --device esp32-door-01 --uid 04A1B2C3    present a card
+    python -m simulator run --device esp32-acc-01         heartbeat + sensor readings, acks commands
+    python -m simulator tap --device esp32-acc-01 --uid 04A1B2C3    present a card
 """
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 import random
@@ -16,11 +17,16 @@ import time
 import paho.mqtt.client as mqtt
 import requests
 
+from simulator.node_state import NodeState
+
 PREFIX = os.environ.get("SIM_TOPIC_PREFIX", "edifika/v1")
 HOST = os.environ.get("SIM_MQTT_HOST", "localhost")
 PORT = int(os.environ.get("SIM_MQTT_PORT", "1883"))
 API = os.environ.get("SIM_GATEWAY_URL", "http://localhost:8000")
 TOKEN = os.environ.get("SIM_SERVICE_TOKEN", "dev-service-token")
+USERNAME = os.environ.get("SIM_MQTT_USERNAME")
+PASSWORD = os.environ.get("SIM_MQTT_PASSWORD")
+TLS = os.environ.get("SIM_MQTT_TLS", "false").lower() in ("true", "1", "yes")
 
 
 def topic(device: str, channel: str) -> str:
@@ -31,9 +37,17 @@ class Node:
     def __init__(self, device: str, ack: bool = True):
         self.device = device
         self.ack = ack
+        self.state = NodeState()
         self.commands: list[dict] = []
         self.received = threading.Event()
-        self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=f"sim-{device}-{os.getpid()}")
+        self.client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=f"sim-{device}-{os.getpid()}",
+        )
+        if USERNAME:
+            self.client.username_pw_set(USERNAME, PASSWORD)
+        if TLS:
+            self.client.tls_set()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
 
@@ -59,31 +73,41 @@ class Node:
     def _on_message(self, client, userdata, msg):
         command = json.loads(msg.payload)
         self.commands.append(command)
-        print(f"[{self.device}] <- {command['type']} {json.dumps(command['params'])}", flush=True)
+        print(f"[{self.device}] <- {command['type']} {json.dumps(command.get('params', {}))}", flush=True)
+        ack = self.state.apply(command)
+        if command["type"] == "mode":
+            print(f"[{self.device}] mode={self.state.mode}", flush=True)
+            if self.state.led != "status":
+                print(f"[{self.device}] led={self.state.led}", flush=True)
+        elif command["type"] == "rgb" and ack.status == "OK":
+            print(f"[{self.device}] led={self.state.led}", flush=True)
         if self.ack:
-            self.publish("ack", commandId=command["commandId"], status="OK")
+            ack_fields = {"commandId": command["commandId"], "status": ack.status}
+            if ack.detail:
+                ack_fields["detail"] = ack.detail
+            self.publish("ack", **ack_fields)
         self.received.set()
 
     def publish(self, channel: str, **fields) -> None:
-        body = {"v": 1, "deviceId": self.device, "ts": time.time(), **fields}
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        body = {"v": "1", "ts": now_iso}
+        if channel == "heartbeat":
+            body["deviceId"] = self.device
+        body.update(fields)
         self.client.publish(topic(self.device, channel), json.dumps(body), qos=1)
 
 
 def run(args) -> None:
     node = Node(args.device, ack=not args.no_ack)
     node.connect()
-    humidity, distance = 45.0, 40.0
-    tick = 0
     print(f"[{args.device}] running (heartbeat every {args.interval}s)", flush=True)
     try:
         while True:
-            node.publish("heartbeat", fw="sim-0.1.0")
-            if tick % 2 == 0:
-                humidity = min(100.0, max(0.0, humidity + random.uniform(-3, 2)))
-                distance = min(120.0, max(5.0, distance + random.uniform(-1, 3)))
-                node.publish("readings", sensor="humidity", value=round(humidity, 1), unit="%")
-                node.publish("readings", sensor="ultrasonic", value=round(distance, 1), unit="cm")
-            tick += 1
+            node.publish("heartbeat", fw="v0.3.0")
+            temp = round(random.uniform(22.0, 27.0), 1)
+            humidity = round(random.uniform(50.0, 70.0), 1)
+            node.publish("readings", sensor="temperature", value=temp, unit="°C")
+            node.publish("readings", sensor="humidity", value=humidity, unit="%")
             time.sleep(args.interval)
     except KeyboardInterrupt:
         node.stop()
@@ -106,6 +130,8 @@ def tap(args) -> None:
 
 
 DEMO_DEVICES = [
+    {"deviceId": "esp32-acc-01", "areaId": "pool", "location": "Pool entrance",
+     "capabilities": ["rfid", "lock", "oled", "buzzer", "rgb_led", "temperature", "humidity"]},
     {"deviceId": "esp32-door-01", "areaId": "pool", "location": "Pool entrance",
      "capabilities": ["rfid", "lock", "oled", "buzzer", "rtc"]},
     {"deviceId": "esp32-garden-01", "areaId": "garden", "location": "Garden and water tank",
@@ -132,12 +158,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="simulator")
     sub = parser.add_subparsers(dest="command", required=True)
     p_run = sub.add_parser("run")
-    p_run.add_argument("--device", required=True)
-    p_run.add_argument("--interval", type=float, default=5.0)
+    p_run.add_argument("--device", default="esp32-acc-01")
+    p_run.add_argument("--interval", type=float, default=10.0)
     p_run.add_argument("--no-ack", action="store_true", help="do not confirm commands (simulates a stuck lock)")
     p_run.set_defaults(func=run)
     p_tap = sub.add_parser("tap")
-    p_tap.add_argument("--device", required=True)
+    p_tap.add_argument("--device", default="esp32-acc-01")
     p_tap.add_argument("--uid", required=True)
     p_tap.set_defaults(func=tap)
     sub.add_parser("seed").set_defaults(func=seed)
