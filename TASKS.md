@@ -90,11 +90,11 @@
 - Métricas: tap -> RabbitMQ <= 6s (PASS); 20 taps during outage -> 20 distinct events without duplicates (PASS); cloud order -> node in < 3s & result return (PASS); local decision < 500ms (PASS)
 - Bloqueos / notas: —
 
-## Task 10 — Documentación y cierre de H1   [ ] pendiente
+## Task 10 — Documentación y cierre de H1   [x] hecha
 - Rama: feature/H1-docs
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 3 — Commit and merge to develop
+- Archivos tocados: README.md, CHANGELOG.md, edge_gateway/__init__.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q --durations=5 → 247 passed in 18s; pytest -m integration → 4 passed in 14.84s
+- Último commit: docs: AMQP integration, broker profiles and door roles (0.2.0) (H1)
+- Métricas: 247 unit/contract tests green (< 20s); 4 integration tests green; tap <= 6s; outage recovery 20 taps; cloud order roundtrip; local decision < 500ms
 - Bloqueos / notas: —
