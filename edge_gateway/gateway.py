@@ -6,7 +6,8 @@ from .mqtt.router import MessageRouter
 from .scheduler import Scheduler
 from .services.access import AccessService
 from .services.alerts import AlertService
-from .services.cloud import CloudClient
+from .services.amqp import AmqpEventPublisher
+from .services.cloud import SyncClient
 from .services.commands import CommandService
 from .services.credentials import CredentialService
 from .services.devices import DeviceService
@@ -17,12 +18,32 @@ from .services.telemetry import TelemetryService
 
 
 class Gateway:
-    def __init__(self, config, clock=None, publisher=None, cloud=None):
+    def __init__(
+        self,
+        config,
+        clock=None,
+        publisher=None,
+        cloud=None,
+        events=None,
+        sync_client=None,
+    ):
         self.config = config
         self.clock = clock or SystemClock()
         self.publisher = PublisherRef(publisher or LoggingPublisher())
-        if cloud is None and config.sync_base_url:
-            cloud = CloudClient(config)
+
+        if cloud is not None:
+            if events is None:
+                events = cloud
+            if sync_client is None:
+                sync_client = cloud
+
+        if events is None and config.amqp_url:
+            events = AmqpEventPublisher(config)
+        if sync_client is None and config.sync_base_url:
+            sync_client = SyncClient(config)
+
+        self.events = events
+        self.sync_client = sync_client
         self.cloud = cloud
 
         self.outbox = OutboxService(config, self.clock)
@@ -35,8 +56,8 @@ class Gateway:
         self.telemetry = TelemetryService(
             config, self.clock, self.devices, self.commands, self.outbox, self.alerts
         )
-        self.forwarder = OutboxForwarder(config, self.clock, self.outbox, self.cloud)
-        self.sync = SyncService(config, self.clock, self.outbox, self.cloud, self.alerts)
+        self.forwarder = OutboxForwarder(config, self.clock, self.outbox, events)
+        self.sync = SyncService(config, self.clock, self.outbox, sync_client, self.alerts)
 
         self.router = MessageRouter(config.mqtt_topic_prefix, on_rejected=self._on_rejected)
         self.router.register("heartbeat", self.devices.on_heartbeat)

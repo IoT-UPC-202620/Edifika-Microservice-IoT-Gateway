@@ -18,13 +18,13 @@
 - Métricas: 200 passed in < 15s
 - Bloqueos / notas: 6 contract tests skipped until Platform schemas published by Lane A.
 
-## Task 3 — Cableado: eventos por AMQP, sync por HTTP con API key   [ ] pendiente
+## Task 3 — Cableado: eventos por AMQP, sync por HTTP con API key   [x] hecha
 - Rama: feature/H1-event-sink-wiring
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/__init__.py, edge_gateway/gateway.py, edge_gateway/services/cloud.py, tests/test_cloud_integration.py, tests/test_gateway_wiring.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 202 passed, 6 skipped
+- Último commit: refactor(gateway): split event sink (AMQP) from cache sync client (HTTP) (H1)
+- Métricas: 202 passed in < 15s
 - Bloqueos / notas: —
 
 ## Task 4 — Nodos y reservas desde la nube, con migración de la base   [ ] pendiente
