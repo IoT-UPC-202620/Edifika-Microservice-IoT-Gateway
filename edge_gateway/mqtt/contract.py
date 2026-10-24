@@ -79,7 +79,9 @@ class AccessSchema(_Message):
 
 
 class ReadingSchema(_Message):
-    sensor = fields.String(required=True, validate=validate.OneOf(["humidity", "ultrasonic"]))
+    sensor = fields.String(
+        required=True, validate=validate.OneOf(["humidity", "ultrasonic", "temperature"])
+    )
     value = fields.Float(required=True, allow_none=True)
     unit = fields.String(load_default="")
 

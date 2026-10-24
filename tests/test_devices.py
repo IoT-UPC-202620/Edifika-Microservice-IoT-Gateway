@@ -175,3 +175,57 @@ def test_api_unknown_device_returns_404(client):
 
 def test_api_rejects_invalid_body(client):
     assert client.post("/api/v1/devices", json={}, headers=AUTH).status_code == 422
+
+
+# --- Task 7: device status events -----------------------------------------------------
+def test_device_back_online_emits_online(gw, clock):
+    gw.devices.register("d-test")
+    # Inactive -> Active
+    gw.devices.on_heartbeat("d-test", {"ts": to_epoch(clock.now())})
+    status_events = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "device_status"]
+    assert any(e.get("deviceId") == "d-test" and e.get("event") == "online" for e in status_events)
+
+    # Active -> Offline
+    clock.advance(seconds=60)
+    gw.devices.check_offline()
+
+    # Offline -> Active
+    clock.advance(seconds=1)
+    gw.devices.on_heartbeat("d-test", {"ts": to_epoch(clock.now())})
+    status_events = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "device_status"]
+    assert status_events[-1]["deviceId"] == "d-test" and status_events[-1]["event"] == "online"
+
+
+def test_silent_device_emits_offline(gw, clock):
+    gw.devices.register("d-silent")
+    gw.devices.on_heartbeat("d-silent", {"ts": to_epoch(clock.now())})
+    clock.advance(seconds=60)
+    gw.devices.check_offline()
+    status_events = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "device_status"]
+    offline_ev = [e for e in status_events if e.get("event") == "offline"]
+    assert len(offline_ev) == 1
+    assert offline_ev[0]["deviceId"] == "d-silent"
+    assert "lastSeen" in offline_ev[0]
+
+
+def test_firmware_change_emits_once(gw):
+    gw.devices.register("d-fw")
+    # First heartbeat with firmware v1.0.0
+    gw.devices.on_heartbeat("d-fw", {"ts": to_epoch(gw.clock.now()), "fw": "v1.0.0"})
+    status_events = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "device_status"]
+    fw_events = [e for e in status_events if e.get("event") == "firmware"]
+    assert len(fw_events) == 1
+    assert fw_events[0] == {"deviceId": "d-fw", "event": "firmware", "firmware": "v1.0.0"}
+
+    # Second heartbeat with same firmware v1.0.0 -> no new event
+    gw.devices.on_heartbeat("d-fw", {"ts": to_epoch(gw.clock.now()), "fw": "v1.0.0"})
+    status_events2 = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "device_status"]
+    fw_events2 = [e for e in status_events2 if e.get("event") == "firmware"]
+    assert len(fw_events2) == 1
+
+    # Third heartbeat with upgraded firmware v1.1.0 -> emits new event
+    gw.devices.on_heartbeat("d-fw", {"ts": to_epoch(gw.clock.now()), "fw": "v1.1.0"})
+    status_events3 = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "device_status"]
+    fw_events3 = [e for e in status_events3 if e.get("event") == "firmware"]
+    assert len(fw_events3) == 2
+    assert fw_events3[1] == {"deviceId": "d-fw", "event": "firmware", "firmware": "v1.1.0"}

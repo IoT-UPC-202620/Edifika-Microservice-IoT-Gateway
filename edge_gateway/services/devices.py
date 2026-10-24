@@ -102,9 +102,16 @@ class DeviceService:
         """Record activity from a node. A node in maintenance stays deactivated."""
         now = self.clock.now()
         device.last_seen = now
+        previous_status = device.status
         if device.status != MAINTENANCE:
             device.status = ACTIVE
         device.save()
+        if previous_status in (OFFLINE, INACTIVE) and device.status == ACTIVE:
+            self.outbox.enqueue(
+                ob.DEVICE_STATUS,
+                {"deviceId": device.device_id, "event": "online"},
+                occurred_at=now,
+            )
         if device.status == ACTIVE:
             self.alerts.clear_alert(device.device_id, "device_offline")
         self.alerts.clear_alert(device.device_id, "firmware_incompatible")
@@ -114,8 +121,14 @@ class DeviceService:
         device = self.known_device(device_id)
         if device is None:
             return
-        if data.get("fw"):
-            device.firmware = data["fw"]
+        fw = data.get("fw")
+        if fw and fw != device.firmware:
+            device.firmware = fw
+            self.outbox.enqueue(
+                ob.DEVICE_STATUS,
+                {"deviceId": device_id, "event": "firmware", "firmware": fw},
+                occurred_at=self.clock.now(),
+            )
         self.touch(device)
         if device.status != MAINTENANCE:
             self._sync_clock_if_drifted(device, data["ts"])
@@ -135,6 +148,15 @@ class DeviceService:
                 device.device_id,
                 "device_offline",
                 {"lastSeen": to_iso(device.last_seen), "discardedCommands": dropped},
+            )
+            self.outbox.enqueue(
+                ob.DEVICE_STATUS,
+                {
+                    "deviceId": device.device_id,
+                    "event": "offline",
+                    "lastSeen": to_iso(device.last_seen),
+                },
+                occurred_at=now,
             )
         return [d.device_id for d in silent]
 

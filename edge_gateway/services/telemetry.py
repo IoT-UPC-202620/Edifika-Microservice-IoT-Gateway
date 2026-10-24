@@ -10,7 +10,11 @@ from . import outbox as ob
 
 logger = logging.getLogger(__name__)
 
-VALID_RANGES = {"humidity": (0.0, 100.0), "ultrasonic": (2.0, 400.0)}  # %, cm
+VALID_RANGES = {
+    "humidity": (0.0, 100.0),
+    "ultrasonic": (2.0, 400.0),
+    "temperature": (-40.0, 85.0),
+}  # %, cm, °C
 CLOCK_TOLERANCE_S = 300
 
 DEFAULTS = {
@@ -80,7 +84,7 @@ class TelemetryService:
         )
         if sensor == "humidity":
             self._evaluate_humidity(device, value)
-        else:
+        elif sensor == "ultrasonic":
             self._evaluate_water_level(device, derived)
 
         payload = {
@@ -90,11 +94,10 @@ class TelemetryService:
             "value": value,
             "unit": unit,
             "capturedAt": to_iso(captured_at),
+            "timeSuspect": bool(suspect),
         }
         if derived is not None:
             payload["levelPct"] = round(derived, 1)
-        if suspect:
-            payload["timeSuspect"] = True
         self.outbox.enqueue(ob.READING, payload, occurred_at=captured_at)
 
     # --- validation ---------------------------------------------------------------
