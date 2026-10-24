@@ -81,14 +81,14 @@
 - Métricas: 247 passed in < 20s
 - Bloqueos / notas: —
 
-## Task 9 — Integración real con RabbitMQ y Mosquitto (métricas H1)   [ ] pendiente
+## Task 9 — Integración real con RabbitMQ y Mosquitto (métricas H1)   [x] hecha
 - Rama: feature/H1-rabbitmq-integration-tests
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
-- Bloqueos / notas: Requiere notificación previa al coordinador ("B READY FOR TASK 9") y su explicit "go".
+- Paso actual: Step 3 — Commit and merge to develop
+- Archivos tocados: edge_gateway/clock.py, pytest.ini, tests/integration/conftest.py, tests/integration/test_rabbitmq_roundtrip.py, TASKS.md
+- Tests: pytest -m integration → 4 passed in 14.84s; pytest -q → 247 passed, 4 deselected in 18s
+- Último commit: test(integration): RabbitMQ round trip, outage recovery and local latency (H1)
+- Métricas: tap -> RabbitMQ <= 6s (PASS); 20 taps during outage -> 20 distinct events without duplicates (PASS); cloud order -> node in < 3s & result return (PASS); local decision < 500ms (PASS)
+- Bloqueos / notas: —
 
 ## Task 10 — Documentación y cierre de H1   [ ] pendiente
 - Rama: feature/H1-docs
