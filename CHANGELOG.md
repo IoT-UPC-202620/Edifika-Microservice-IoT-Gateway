@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-24
+
+### Added
+- Door state reconciliation: heartbeats may carry `mode` and `color`; when they differ from the latest configuration the gateway re-sends `mode` (at most every `EDGE_MODE_RESYNC_INTERVAL_S`, 10 s), so a rebooted or reconnected node recovers its role and LED colour even if it never went OFFLINE (H1).
+
+### Changed
+- Cloud LED orders also accept the `set_led` alias in addition to the contract type `rgb` (H1).
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
