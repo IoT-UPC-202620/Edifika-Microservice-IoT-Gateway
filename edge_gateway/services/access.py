@@ -5,7 +5,14 @@ from datetime import time, timedelta
 
 from ..clock import local_time
 from ..db import database
-from ..models import AccessAttempt, AccessPermission, AreaSchedule, Credential
+from ..models import (
+    AccessAttempt,
+    AccessPermission,
+    AreaSchedule,
+    Credential,
+    Device,
+    DoorReservation,
+)
 from . import outbox as ob
 
 logger = logging.getLogger(__name__)
@@ -21,6 +28,7 @@ MESSAGES = {
     "credential_expired": "Card expired",
     "outside_schedule": "Outside schedule",
     "no_permission": "No reservation",
+    "not_authorized": "Not authorized",
     "maintenance": "Under maintenance",
     "unsupported_credential_type": "Unsupported card",
 }
@@ -99,11 +107,61 @@ class AccessService:
                     "residentId": credential.resident_id if credential else None,
                     "result": result,
                     "reason": reason,
+                    "accessMode": self.current_mode(device, now),
                 },
                 occurred_at=now,
             )
         self._detect_repeated_denials(device_id, uid, now)
         self._answer_node(device, result, reason, credential)
+
+    def current_mode(self, device, now=None) -> str:
+        now = now or self.clock.now()
+        has_res = (
+            DoorReservation.select()
+            .where(
+                DoorReservation.device_id == device.device_id,
+                DoorReservation.starts_at <= now,
+                DoorReservation.ends_at > now,
+            )
+            .exists()
+        )
+        return "RESERVED" if has_res else "FREE_ACCESS"
+
+    def check_mode_changes(self, now=None) -> list[str]:
+        now = now or self.clock.now()
+        changed = []
+        for device in Device.select():
+            if "lock" not in device.capability_list:
+                continue
+            calculated = self.current_mode(device, now)
+            if calculated != device.current_mode:
+                old_mode = device.current_mode
+                device.current_mode = calculated
+                if calculated == "FREE_ACCESS":
+                    device.led_color = None
+                device.save()
+
+                if calculated == "RESERVED":
+                    params = {"mode": "RESERVED"}
+                    if device.led_color is not None:
+                        params["color"] = device.led_color
+                else:
+                    params = {"mode": "FREE_ACCESS"}
+
+                self.commands.send(device.device_id, "mode", params)
+
+                self.outbox.enqueue(
+                    ob.DEVICE_STATUS,
+                    {
+                        "deviceId": device.device_id,
+                        "event": "mode_changed",
+                        "from": old_mode,
+                        "to": calculated,
+                    },
+                    occurred_at=now,
+                )
+                changed.append(device.device_id)
+        return changed
 
     def decide(self, device, uid: str, now):
         """Return (result, reason, credential) for a card read at a node."""
@@ -116,6 +174,24 @@ class AccessService:
             credential.valid_until and now > credential.valid_until
         ):
             return DENIED, "credential_expired", credential
+
+        mode = self.current_mode(device, now)
+        if device.managed == "cloud":
+            if mode == "RESERVED":
+                permitted = (
+                    AccessPermission.select()
+                    .where(
+                        AccessPermission.device_id == device.device_id,
+                        AccessPermission.resident_id == credential.resident_id,
+                        AccessPermission.starts_at <= now,
+                        AccessPermission.ends_at >= now,
+                    )
+                    .exists()
+                )
+                if not permitted:
+                    return DENIED, "not_authorized", credential
+            return GRANTED, "ok", credential
+
         if device.area_id:
             schedule = AreaSchedule.get_or_none(AreaSchedule.area_id == device.area_id)
             if schedule and not within_schedule(schedule, local_time(now, self.config.timezone)):
