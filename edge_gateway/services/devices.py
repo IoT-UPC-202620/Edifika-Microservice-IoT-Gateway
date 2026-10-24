@@ -11,7 +11,17 @@ from .errors import ConflictError, NotFoundError, ValidationFailed
 
 logger = logging.getLogger(__name__)
 
-CAPABILITIES = {"rfid", "lock", "buzzer", "oled", "humidity", "ultrasonic", "rtc"}
+CAPABILITIES = {
+    "rfid",
+    "lock",
+    "buzzer",
+    "oled",
+    "humidity",
+    "ultrasonic",
+    "rtc",
+    "rgb_led",
+    "temperature",
+}
 TIME_SYNC_COOLDOWN_S = 30
 
 ACTIVE = "ACTIVE"

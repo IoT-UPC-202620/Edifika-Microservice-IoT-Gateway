@@ -27,13 +27,13 @@
 - Métricas: 202 passed in < 15s
 - Bloqueos / notas: —
 
-## Task 4 — Nodos y reservas desde la nube, con migración de la base   [ ] pendiente
+## Task 4 — Nodos y reservas desde la nube, con migración de la base   [x] hecha
 - Rama: feature/H1-cloud-devices-reservations
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/models.py, edge_gateway/db.py, edge_gateway/services/devices.py, edge_gateway/services/sync.py, tests/test_persistence.py, tests/test_sync_devices.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 209 passed, 6 skipped
+- Último commit: feat(sync): cloud-managed devices and door reservations with schema migration (H1)
+- Métricas: 209 passed in < 15s
 - Bloqueos / notas: —
 
 ## Task 5 — Decisión por rol y cambio de rol en el nodo   [ ] pendiente
