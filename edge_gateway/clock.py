@@ -10,9 +10,11 @@ class SystemClock:
 
 
 def to_iso(value: datetime | None) -> str | None:
-    """Naive UTC datetime -> ISO 8601 string with a Z suffix."""
+    """UTC datetime -> ISO 8601 string with a Z suffix."""
     if value is None:
         return None
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc).replace(tzinfo=None)
     return value.isoformat(timespec="milliseconds") + "Z"
 
 
@@ -20,7 +22,10 @@ def from_iso(value: str | None) -> datetime | None:
     """ISO 8601 string (Z or offset) -> naive UTC datetime."""
     if not value:
         return None
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    val = value
+    if val.endswith("Z") or val.endswith("z"):
+        val = val[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(val)
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
     return parsed
