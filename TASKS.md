@@ -54,13 +54,13 @@
 - Métricas: 231 passed in < 15s (including Platform JSON schema contract tests)
 - Bloqueos / notas: —
 
-## Task 7 — Temperatura y eventos de estado del nodo   [ ] pendiente
+## Task 7 — Temperatura y eventos de estado del nodo   [x] hecha
 - Rama: feature/H1-temperature-device-status
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/mqtt/contract.py, edge_gateway/services/devices.py, edge_gateway/services/telemetry.py, tests/test_devices.py, tests/test_telemetry.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 236 passed
+- Último commit: feat(telemetry): temperature readings and online/offline/firmware status events (H1)
+- Métricas: 236 passed in < 15s
 - Bloqueos / notas: —
 
 ## Task 7A — Dialecto del firmware de referencia (esp32) y recuperación del rol   [ ] pendiente
