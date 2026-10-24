@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.2.0] - unreleased
+## [0.2.0] - 2026-10-24
 
 ### Added
 - RabbitMQ integration via AMQP publisher with publisher confirms to `edifika.events` exchange (H1).
