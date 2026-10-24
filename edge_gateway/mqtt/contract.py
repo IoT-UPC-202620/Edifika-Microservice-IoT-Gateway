@@ -86,6 +86,11 @@ class _Message(Schema):
 class HeartbeatSchema(_Message):
     deviceId = fields.String(required=True, validate=validate.Length(min=1, max=64))
     fw = fields.String(load_default=None, allow_none=True)
+    # Door state as the node currently shows it; the gateway re-sends `mode` when it is stale.
+    mode = fields.String(load_default=None, allow_none=True, validate=validate.OneOf(["FREE_ACCESS", "RESERVED"]))
+    color = fields.String(
+        load_default=None, allow_none=True, validate=validate.Regexp(r"^#[0-9a-fA-F]{6}$", error="Expected #RRGGBB")
+    )
 
 
 class AccessSchema(_Message):
