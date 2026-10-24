@@ -65,6 +65,22 @@ class Gateway:
         self.router.register("readings", self.telemetry.on_reading)
         self.router.register("ack", self.commands.handle_ack)
 
+        self.command_consumer = None
+        if config.amqp_url:
+            from .services.amqp import AmqpCommandConsumer
+            from .services.cloud_commands import CloudCommandHandler
+
+            handler = CloudCommandHandler(
+                config,
+                self.clock,
+                self.devices,
+                self.access,
+                self.commands,
+                self.sync,
+                self.outbox,
+            )
+            self.command_consumer = AmqpCommandConsumer(config, handler)
+
         self.schedulers: list[Scheduler] = []
 
     def use_publisher(self, publisher) -> None:
@@ -103,7 +119,11 @@ class Gateway:
         self.schedulers = [local, cloud]
         for scheduler in self.schedulers:
             scheduler.start()
+        if self.command_consumer is not None:
+            self.command_consumer.start()
 
     def stop_background(self) -> None:
+        if self.command_consumer is not None:
+            self.command_consumer.stop()
         for scheduler in self.schedulers:
             scheduler.stop()

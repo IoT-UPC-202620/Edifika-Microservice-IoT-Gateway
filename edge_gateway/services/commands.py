@@ -30,6 +30,7 @@ class Pending:
     waiting: bool = False  # a REST caller is waiting for the ack and owns the timeout
     event: threading.Event = field(default_factory=threading.Event)
     status: str | None = None
+    report: bool = False
 
 
 class PendingCommands:
@@ -82,10 +83,19 @@ class CommandService:
         self.outbox = outbox
         self.pending = PendingCommands()
 
-    def send(self, device_id: str, type_: str, params: dict | None = None, *, waiting=False) -> Pending:
+    def send(
+        self,
+        device_id: str,
+        type_: str,
+        params: dict | None = None,
+        *,
+        waiting=False,
+        command_id: str | None = None,
+        report: bool = False,
+    ) -> Pending:
         """Publish a command and track its acknowledgement."""
         now = self.clock.now()
-        command_id = uuid.uuid4().hex
+        command_id = command_id or uuid.uuid4().hex
         command = {
             "v": contract.SCHEMA_VERSION,
             "commandId": command_id,
@@ -100,6 +110,7 @@ class CommandService:
             deadline=now + timedelta(seconds=self.config.ack_timeout_s),
             lock=expects_lock_movement(type_, params or {}),
             waiting=waiting,
+            report=report,
         )
         self.pending.add(pending)
         try:
@@ -132,6 +143,17 @@ class CommandService:
                     "type": pending.type,
                     "status": "FAILED",
                     "detail": data.get("detail"),
+                },
+            )
+        elif data["status"] == "OK" and pending.report:
+            self.outbox.enqueue(
+                ob.COMMAND_RESULT,
+                {
+                    "deviceId": device_id,
+                    "commandId": pending.command_id,
+                    "type": pending.type,
+                    "status": "OK",
+                    "detail": None,
                 },
             )
 

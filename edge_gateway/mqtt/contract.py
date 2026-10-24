@@ -8,6 +8,7 @@ Node -> Gateway (published by the firmware):
 
 Gateway -> Node (published by the gateway):
     {prefix}/nodes/{deviceId}/commands    {v, commandId, type, params, ts}
+    types include: access_result, mode ({mode, color?}), rgb ({color}), unlock, display, buzzer, alert, maintenance, time_sync
 
 `ts` is the node clock in epoch seconds. A reading `value` may be null when the
 sensor produced no measurement (for example, an ultrasonic sensor without echo).

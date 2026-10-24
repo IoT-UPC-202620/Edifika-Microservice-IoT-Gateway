@@ -45,13 +45,13 @@
 - Métricas: 214 passed in < 15s
 - Bloqueos / notas: —
 
-## Task 6 — Órdenes de la nube (sync-requested, rgb)   [ ] pendiente
+## Task 6 — Órdenes de la nube (sync-requested, rgb)   [x] hecha
 - Rama: feature/H1-cloud-orders
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/services/cloud_commands.py, edge_gateway/services/amqp.py, edge_gateway/services/commands.py, edge_gateway/mqtt/contract.py, edge_gateway/gateway.py, tests/test_cloud_commands.py, tests/test_amqp_publisher.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 231 passed (0 skipped)
+- Último commit: feat(amqp): consume cloud orders (sync-requested, rgb) from the gateway queue (H1)
+- Métricas: 231 passed in < 15s (including Platform JSON schema contract tests)
 - Bloqueos / notas: —
 
 ## Task 7 — Temperatura y eventos de estado del nodo   [ ] pendiente
