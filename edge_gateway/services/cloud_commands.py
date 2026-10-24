@@ -82,7 +82,7 @@ class CloudCommandHandler:
                 return
 
             # 4. Unsupported command type
-            if type_ != "rgb":
+            if type_ not in ("rgb", "set_led", "SET_LED"):
                 self._report(device_code, command_id, type_, "FAILED", "unsupported command")
                 return
 
