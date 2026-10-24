@@ -17,7 +17,7 @@ from ..models import (
 )
 from . import outbox as ob
 from .access import normalize_uid
-from .cloud import CloudRejected, CloudUnavailable
+from .transport import CloudRejected, CloudUnavailable
 
 logger = logging.getLogger(__name__)
 
