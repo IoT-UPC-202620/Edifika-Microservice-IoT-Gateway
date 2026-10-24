@@ -133,6 +133,8 @@ class DeviceService:
                 occurred_at=self.clock.now(),
             )
         self.touch(device)
+        if device.status != MAINTENANCE and "lock" in device.capability_list and self.access is not None:
+            self.access.reconcile_mode(device, data.get("mode"), data.get("color"))
         if device.status != MAINTENANCE:
             if data.get("ts") is not None:
                 self._sync_clock_if_drifted(device, data["ts"])

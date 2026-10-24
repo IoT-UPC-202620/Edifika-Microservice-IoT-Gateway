@@ -67,6 +67,7 @@ class AccessService:
         self.commands = commands
         self.outbox = outbox
         self._recent: dict[tuple[str, str], object] = {}
+        self._mode_sent_at: dict[str, object] = {}
 
     def on_access(self, device_id: str, data: dict) -> None:
         device = self.devices.known_device(device_id)
@@ -138,8 +139,36 @@ class AccessService:
             params = {"mode": "FREE_ACCESS"}
         try:
             self.commands.send(device.device_id, "mode", params)
+            self._mode_sent_at[device.device_id] = now
         except Exception:
             logger.exception("Could not resend mode to node %s", device.device_id)
+
+    def reconcile_mode(self, device: Device, reported_mode: str | None, reported_color: str | None) -> bool:
+        """Re-send `mode` when the state a node reports differs from the latest configuration.
+
+        Covers a rebooted node, an MQTT reconnection and a command lost while disconnected.
+        Nodes that do not report their state (older firmware) are left alone. Returns True if sent.
+        """
+        if reported_mode is None:
+            return False
+        now = self.clock.now()
+        desired_mode = self.current_mode(device, now)
+        stale = reported_mode != desired_mode or (
+            desired_mode == "RESERVED"
+            and device.led_color is not None
+            and (reported_color or "").upper() != device.led_color.upper()
+        )
+        if not stale:
+            return False
+        last = self._mode_sent_at.get(device.device_id)
+        if last is not None and now - last < timedelta(seconds=self.config.mode_resync_interval_s):
+            return False  # the previous re-send is still on its way; the next heartbeat re-checks
+        logger.info(
+            "Node %s reports %s/%s, expected %s/%s: re-sending mode",
+            device.device_id, reported_mode, reported_color, desired_mode, device.led_color,
+        )
+        self.resend_mode(device)
+        return True
 
     def check_mode_changes(self, now=None) -> list[str]:
         now = now or self.clock.now()

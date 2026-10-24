@@ -56,6 +56,7 @@ class Config:
     dedupe_window_s: float = 2.0
     lock_open_ms: int = 5000
     clock_drift_s: int = 2
+    mode_resync_interval_s: float = 10.0  # min seconds between two mode re-sends to the same node
     max_maintenance_minutes: int = 240
     cache_max_age_s: int = 24 * 3600
 
