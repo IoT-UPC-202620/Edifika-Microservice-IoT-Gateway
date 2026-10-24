@@ -119,7 +119,7 @@ Supports reference firmware dialect: `v` as `1` or `"1"`, `ts` as epoch seconds,
 
 | Direction | Topic | Payload |
 |---|---|---|
-| node → gateway | `…/nodes/{deviceId}/heartbeat` | `{v, deviceId, ts, fw?}` |
+| node → gateway | `…/nodes/{deviceId}/heartbeat` | `{v, deviceId, ts, fw?, mode?, color?}`: `mode`/`color` report what the door shows; if they differ from the latest configuration the gateway re-sends `mode` (at most every `EDGE_MODE_RESYNC_INTERVAL_S`, 10 s) |
 | node → gateway | `…/nodes/{deviceId}/access` | `{v, deviceId?, ts, credentialType: "RFID", credential}` |
 | node → gateway | `…/nodes/{deviceId}/readings` | `{v, deviceId?, ts, sensor, value, unit}` |
 | node → gateway | `…/nodes/{deviceId}/ack` | `{v, deviceId?, ts, commandId, status: "OK"\|"FAILED"\|"ERROR", detail?}` |

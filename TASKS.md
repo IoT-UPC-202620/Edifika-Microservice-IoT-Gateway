@@ -98,3 +98,10 @@
 - Último commit: docs: AMQP integration, broker profiles and door roles (0.2.0) (H1)
 - Métricas: 247 unit/contract tests green (< 20s); 4 integration tests green; tap <= 6s; outage recovery 20 taps; cloud order roundtrip; local decision < 500ms
 - Bloqueos / notas: —
+
+## Task 11 — Door state reconciliation from heartbeats (requested by Jonatan, 2026-10-24)   [x] hecha
+- Rama: feature/H1-heartbeat-mode-reconciliation
+- Motivo: probado con la placa real: un reinicio corto (< 30 s) no pasa por OFFLINE, así que el nodo volvía en FREE_ACCESS con el LED apagado mientras la reserva seguía activa.
+- Cambio: el heartbeat acepta `mode` y `color` opcionales; `AccessService.reconcile_mode` re-envía `mode` (con color) cuando difieren de la configuración vigente, como máximo cada `mode_resync_interval_s` (10 s). Nodos sin esos campos no se reconcilian.
+- Archivos tocados: edge_gateway/config.py, edge_gateway/mqtt/contract.py, edge_gateway/services/access.py, edge_gateway/services/devices.py, tests/test_mode_reconciliation.py, README.md
+- Tests: .venv/Scripts/python -m pytest -q → 255 passed, 4 deselected in 14.3 s (8 nuevos)
