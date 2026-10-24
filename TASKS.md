@@ -9,14 +9,14 @@
 - Métricas: 193 tests passing
 - Bloqueos / notas: —
 
-## Task 2 — Publicador AMQP de eventos con confirmaciones   [ ] pendiente
+## Task 2 — Publicador AMQP de eventos con confirmaciones   [x] hecha
 - Rama: feature/H1-amqp-publisher
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
-- Bloqueos / notas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/services/transport.py, edge_gateway/services/amqp.py, edge_gateway/services/cloud.py, edge_gateway/services/outbox.py, edge_gateway/services/sync.py, tests/helpers.py, tests/test_amqp_publisher.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 200 passed, 6 skipped
+- Último commit: feat(amqp): publish outbox events to RabbitMQ with publisher confirms (H1)
+- Métricas: 200 passed in < 15s
+- Bloqueos / notas: 6 contract tests skipped until Platform schemas published by Lane A.
 
 ## Task 3 — Cableado: eventos por AMQP, sync por HTTP con API key   [ ] pendiente
 - Rama: feature/H1-event-sink-wiring

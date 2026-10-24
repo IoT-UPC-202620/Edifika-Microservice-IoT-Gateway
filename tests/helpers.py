@@ -51,7 +51,7 @@ class FakeCloud:
         self.sync_requests = []
 
     def post_events(self, events):
-        from edge_gateway.services.cloud import CloudRejected, CloudUnavailable
+        from edge_gateway.services.transport import CloudRejected, CloudUnavailable
 
         self.calls += 1
         if self.down:
@@ -64,7 +64,7 @@ class FakeCloud:
         return [e["eventId"] for e in accepted]
 
     def fetch_sync(self, since_version):
-        from edge_gateway.services.cloud import CloudUnavailable
+        from edge_gateway.services.transport import CloudUnavailable
 
         self.sync_requests.append(since_version)
         if self.down:

@@ -4,15 +4,9 @@ import logging
 
 import requests
 
+from .transport import CloudRejected, CloudUnavailable
+
 logger = logging.getLogger(__name__)
-
-
-class CloudUnavailable(Exception):
-    """The backend cannot be reached or answered with a transient error: retry later."""
-
-
-class CloudRejected(Exception):
-    """The backend refused the request (4xx): retrying the same payload will not help."""
 
 
 class CloudClient:

@@ -97,7 +97,7 @@ class OutboxForwarder:
         """Send pending events. Returns how many were delivered."""
         from datetime import timedelta
 
-        from .cloud import CloudRejected, CloudUnavailable
+        from .transport import CloudRejected, CloudUnavailable
 
         if self.cloud is None:
             return 0
