@@ -89,6 +89,7 @@ class Gateway:
         self.devices.expire_maintenance()
         self.commands.check_timeouts()
         self.sync.check_staleness()
+        self.access.check_mode_changes()
 
     def start_background(self) -> None:
         # Cloud calls can block for their timeout, so they run apart from the local checks.

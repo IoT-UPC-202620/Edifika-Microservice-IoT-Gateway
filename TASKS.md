@@ -36,13 +36,13 @@
 - Métricas: 209 passed in < 15s
 - Bloqueos / notas: —
 
-## Task 5 — Decisión por rol y cambio de rol en el nodo   [ ] pendiente
+## Task 5 — Decisión por rol y cambio de rol en el nodo   [x] hecha
 - Rama: feature/H1-door-roles
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/services/access.py, edge_gateway/gateway.py, tests/test_access_modes.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 214 passed, 6 skipped
+- Último commit: feat(access): door role from reservations with offline mode switching (H1)
+- Métricas: 214 passed in < 15s
 - Bloqueos / notas: —
 
 ## Task 6 — Órdenes de la nube (sync-requested, rgb)   [ ] pendiente
