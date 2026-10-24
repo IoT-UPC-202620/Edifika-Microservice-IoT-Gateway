@@ -8,6 +8,7 @@ x-gateway-image: &gateway-image
 services:
   mosquitto:
     image: eclipse-mosquitto:2
+    profiles: ["broker"]
     ports:
       - "1883:1883"
     volumes:
@@ -15,6 +16,19 @@ services:
       - mosquitto-data:/mosquitto/data
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 3 > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    profiles: ["cloud-local"]
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -37,18 +51,17 @@ services:
   edge-gateway:
     <<: *gateway-image
     depends_on:
-      mosquitto:
-        condition: service_healthy
       mock-cloud:
         condition: service_healthy
     environment:
       EDGE_GATEWAY_ID: ${GATEWAY_ID:-edge-gateway-01}
       EDGE_SERVICE_TOKEN: ${SERVICE_TOKEN:-dev-service-token}
       EDGE_DATABASE_PATH: /data/edge-gateway.db
-      EDGE_MQTT_HOST: mosquitto
+      EDGE_MQTT_HOST: ${MQTT_HOST:-mosquitto}
       EDGE_MQTT_PORT: "1883"
-      EDGE_CLOUD_BASE_URL: http://mock-cloud:9000
-      EDGE_CLOUD_TOKEN: ${CLOUD_TOKEN:-dev-cloud-token}
+      EDGE_AMQP_URL: ${AMQP_URL:-amqp://guest:guest@rabbitmq:5672/}
+      EDGE_SYNC_BASE_URL: ${SYNC_BASE_URL:-http://mock-cloud:9000}
+      EDGE_SYNC_API_KEY: ${SYNC_API_KEY:-dev-cloud-token}
       EDGE_TIMEZONE: ${TIMEZONE:-America/Lima}
     ports:
       - "8000:8000"

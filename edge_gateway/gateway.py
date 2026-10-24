@@ -21,7 +21,7 @@ class Gateway:
         self.config = config
         self.clock = clock or SystemClock()
         self.publisher = PublisherRef(publisher or LoggingPublisher())
-        if cloud is None and config.cloud_base_url:
+        if cloud is None and config.sync_base_url:
             cloud = CloudClient(config)
         self.cloud = cloud
 

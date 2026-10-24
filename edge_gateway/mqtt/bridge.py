@@ -39,13 +39,16 @@ class MqttBridge:
     def __init__(self, config, router, client_factory=None):
         self.config = config
         self.router = router
+        client_id = config.mqtt_client_id or config.gateway_id
         factory = client_factory or (
             lambda: mqtt.Client(
                 callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-                client_id=f"{config.gateway_id}",
+                client_id=client_id,
             )
         )
         self.client = factory()
+        if config.mqtt_tls:
+            self.client.tls_set(ca_certs=config.mqtt_ca_file or None)
         if config.mqtt_username:
             self.client.username_pw_set(config.mqtt_username, config.mqtt_password)
         self.client.reconnect_delay_set(min_delay=1, max_delay=30)

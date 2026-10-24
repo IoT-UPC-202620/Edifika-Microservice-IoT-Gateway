@@ -199,7 +199,7 @@ class FakeSession:
 
 
 def make_client(response=None, error=None):
-    config = Config(service_token="x", cloud_base_url="http://cloud:9000/", cloud_token="secret", gateway_id="gw-7")
+    config = Config(service_token="x", sync_base_url="http://cloud:9000/", sync_api_key="secret", gateway_id="gw-7")
     session = FakeSession(response, error)
     return CloudClient(config, session), session
 

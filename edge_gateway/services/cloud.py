@@ -18,13 +18,13 @@ class CloudRejected(Exception):
 class CloudClient:
     def __init__(self, config, session=None):
         self.config = config
-        self.base_url = config.cloud_base_url.rstrip("/")
+        self.base_url = config.sync_base_url.rstrip("/")
         self.session = session or requests.Session()
 
     def _headers(self) -> dict:
         headers = {"X-Gateway-Id": self.config.gateway_id}
-        if self.config.cloud_token:
-            headers["Authorization"] = f"Bearer {self.config.cloud_token}"
+        if self.config.sync_api_key:
+            headers["Authorization"] = f"Bearer {self.config.sync_api_key}"
         return headers
 
     def _request(self, method: str, path: str, **kwargs) -> dict:

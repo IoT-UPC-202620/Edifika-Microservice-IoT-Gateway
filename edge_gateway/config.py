@@ -1,7 +1,10 @@
 """Runtime configuration for the Edge Gateway, loaded from environment variables."""
 
+import logging
 import os
 from dataclasses import dataclass, fields
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigError(RuntimeError):
@@ -20,7 +23,6 @@ class Config:
 
     # Security: bearer token required by the local REST API (cloud and admin callers)
     service_token: str = ""
-    cloud_token: str = ""
 
     # Persistence
     database_path: str = "data/edge-gateway.db"
@@ -32,9 +34,19 @@ class Config:
     mqtt_username: str = ""
     mqtt_password: str = ""
     mqtt_topic_prefix: str = "edifika/v1"
+    mqtt_tls: bool = False
+    mqtt_ca_file: str = ""
+    mqtt_client_id: str = ""
 
-    # Cloud backend
-    cloud_base_url: str = ""
+    # AMQP broker
+    amqp_url: str = ""
+    amqp_events_exchange: str = "edifika.events"
+    amqp_commands_exchange: str = "edifika.edge.commands"
+    amqp_prefetch: int = 10
+
+    # Sync service (IoT Access Management)
+    sync_base_url: str = ""
+    sync_api_key: str = ""
     cloud_timeout_s: float = 5.0
 
     # Behaviour
@@ -59,7 +71,14 @@ class Config:
 
     @classmethod
     def from_env(cls, env=None) -> "Config":
-        env = os.environ if env is None else env
+        env = dict(os.environ if env is None else env)
+        if "EDGE_CLOUD_BASE_URL" in env and "EDGE_SYNC_BASE_URL" not in env:
+            logger.warning("EDGE_CLOUD_BASE_URL is deprecated; use EDGE_SYNC_BASE_URL")
+            env["EDGE_SYNC_BASE_URL"] = env["EDGE_CLOUD_BASE_URL"]
+        if "EDGE_CLOUD_TOKEN" in env and "EDGE_SYNC_API_KEY" not in env:
+            logger.warning("EDGE_CLOUD_TOKEN is deprecated; use EDGE_SYNC_API_KEY")
+            env["EDGE_SYNC_API_KEY"] = env["EDGE_CLOUD_TOKEN"]
+
         values = {}
         for f in fields(cls):
             raw = env.get("EDGE_" + f.name.upper())
