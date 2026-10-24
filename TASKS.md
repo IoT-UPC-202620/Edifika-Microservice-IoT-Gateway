@@ -72,13 +72,13 @@
 - Métricas: 243 passed in < 20s
 - Bloqueos / notas: —
 
-## Task 8 — Simulador del nodo de puerta   [ ] pendiente
+## Task 8 — Simulador del nodo de puerta   [x] hecha
 - Rama: feature/H1-door-simulator
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: simulator/__main__.py, simulator/node_state.py, tests/test_simulator_state.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 247 passed
+- Último commit: feat(simulator): door node with role, RGB LED and temperature/humidity (H1)
+- Métricas: 247 passed in < 20s
 - Bloqueos / notas: —
 
 ## Task 9 — Integración real con RabbitMQ y Mosquitto (métricas H1)   [ ] pendiente
