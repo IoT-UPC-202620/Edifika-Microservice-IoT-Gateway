@@ -1,0 +1,100 @@
+# TASKS — Lane B (Plan 1: Edge Gateway)
+
+## Task 1 — Configuración, TLS MQTT y broker independiente   [x] hecha
+- Rama: feature/H1-configurable-endpoints
+- Paso actual: Step 6 — Commit and merge to develop
+- Archivos tocados: .env.example, docker-compose.yml, edge_gateway/config.py, edge_gateway/gateway.py, edge_gateway/mqtt/bridge.py, edge_gateway/services/cloud.py, requirements.txt, tests/test_cloud_integration.py, tests/test_config.py, tests/test_mqtt_contract.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 193 passed
+- Último commit: feat(config): configurable MQTT TLS, AMQP and sync endpoints with legacy aliases (H1)
+- Métricas: 193 tests passing
+- Bloqueos / notas: —
+
+## Task 2 — Publicador AMQP de eventos con confirmaciones   [x] hecha
+- Rama: feature/H1-amqp-publisher
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/services/transport.py, edge_gateway/services/amqp.py, edge_gateway/services/cloud.py, edge_gateway/services/outbox.py, edge_gateway/services/sync.py, tests/helpers.py, tests/test_amqp_publisher.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 200 passed, 6 skipped
+- Último commit: feat(amqp): publish outbox events to RabbitMQ with publisher confirms (H1)
+- Métricas: 200 passed in < 15s
+- Bloqueos / notas: 6 contract tests skipped until Platform schemas published by Lane A.
+
+## Task 3 — Cableado: eventos por AMQP, sync por HTTP con API key   [x] hecha
+- Rama: feature/H1-event-sink-wiring
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/__init__.py, edge_gateway/gateway.py, edge_gateway/services/cloud.py, tests/test_cloud_integration.py, tests/test_gateway_wiring.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 202 passed, 6 skipped
+- Último commit: refactor(gateway): split event sink (AMQP) from cache sync client (HTTP) (H1)
+- Métricas: 202 passed in < 15s
+- Bloqueos / notas: —
+
+## Task 4 — Nodos y reservas desde la nube, con migración de la base   [x] hecha
+- Rama: feature/H1-cloud-devices-reservations
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/models.py, edge_gateway/db.py, edge_gateway/services/devices.py, edge_gateway/services/sync.py, tests/test_persistence.py, tests/test_sync_devices.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 209 passed, 6 skipped
+- Último commit: feat(sync): cloud-managed devices and door reservations with schema migration (H1)
+- Métricas: 209 passed in < 15s
+- Bloqueos / notas: —
+
+## Task 5 — Decisión por rol y cambio de rol en el nodo   [x] hecha
+- Rama: feature/H1-door-roles
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/services/access.py, edge_gateway/gateway.py, tests/test_access_modes.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 214 passed, 6 skipped
+- Último commit: feat(access): door role from reservations with offline mode switching (H1)
+- Métricas: 214 passed in < 15s
+- Bloqueos / notas: —
+
+## Task 6 — Órdenes de la nube (sync-requested, rgb)   [x] hecha
+- Rama: feature/H1-cloud-orders
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/services/cloud_commands.py, edge_gateway/services/amqp.py, edge_gateway/services/commands.py, edge_gateway/mqtt/contract.py, edge_gateway/gateway.py, tests/test_cloud_commands.py, tests/test_amqp_publisher.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 231 passed (0 skipped)
+- Último commit: feat(amqp): consume cloud orders (sync-requested, rgb) from the gateway queue (H1)
+- Métricas: 231 passed in < 15s (including Platform JSON schema contract tests)
+- Bloqueos / notas: —
+
+## Task 7 — Temperatura y eventos de estado del nodo   [x] hecha
+- Rama: feature/H1-temperature-device-status
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/mqtt/contract.py, edge_gateway/services/devices.py, edge_gateway/services/telemetry.py, tests/test_devices.py, tests/test_telemetry.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 236 passed
+- Último commit: feat(telemetry): temperature readings and online/offline/firmware status events (H1)
+- Métricas: 236 passed in < 15s
+- Bloqueos / notas: —
+
+## Task 7A — Dialecto del firmware de referencia (esp32) y recuperación del rol   [x] hecha
+- Rama: feature/H1-esp32-firmware-dialect
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/gateway.py, edge_gateway/mqtt/contract.py, edge_gateway/services/access.py, edge_gateway/services/devices.py, edge_gateway/services/telemetry.py, tests/helpers.py, tests/test_firmware_dialect.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 243 passed
+- Último commit: feat(mqtt): accept the esp32 firmware envelope and resend the door mode on reconnect (H1)
+- Métricas: 243 passed in < 20s
+- Bloqueos / notas: —
+
+## Task 8 — Simulador del nodo de puerta   [x] hecha
+- Rama: feature/H1-door-simulator
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: simulator/__main__.py, simulator/node_state.py, tests/test_simulator_state.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 247 passed
+- Último commit: feat(simulator): door node with role, RGB LED and temperature/humidity (H1)
+- Métricas: 247 passed in < 20s
+- Bloqueos / notas: —
+
+## Task 9 — Integración real con RabbitMQ y Mosquitto (métricas H1)   [x] hecha
+- Rama: feature/H1-rabbitmq-integration-tests
+- Paso actual: Step 3 — Commit and merge to develop
+- Archivos tocados: edge_gateway/clock.py, pytest.ini, tests/integration/conftest.py, tests/integration/test_rabbitmq_roundtrip.py, TASKS.md
+- Tests: pytest -m integration → 4 passed in 14.84s; pytest -q → 247 passed, 4 deselected in 18s
+- Último commit: test(integration): RabbitMQ round trip, outage recovery and local latency (H1)
+- Métricas: tap -> RabbitMQ <= 6s (PASS); 20 taps during outage -> 20 distinct events without duplicates (PASS); cloud order -> node in < 3s & result return (PASS); local decision < 500ms (PASS)
+- Bloqueos / notas: —
+
+## Task 10 — Documentación y cierre de H1   [x] hecha
+- Rama: feature/H1-docs
+- Paso actual: Step 3 — Commit and merge to develop
+- Archivos tocados: README.md, CHANGELOG.md, edge_gateway/__init__.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q --durations=5 → 247 passed in 18s; pytest -m integration → 4 passed in 14.84s
+- Último commit: docs: AMQP integration, broker profiles and door roles (0.2.0) (H1)
+- Métricas: 247 unit/contract tests green (< 20s); 4 integration tests green; tap <= 6s; outage recovery 20 taps; cloud order roundtrip; local decision < 500ms
+- Bloqueos / notas: —

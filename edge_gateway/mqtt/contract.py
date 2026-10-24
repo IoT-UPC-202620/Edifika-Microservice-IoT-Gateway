@@ -8,12 +8,14 @@ Node -> Gateway (published by the firmware):
 
 Gateway -> Node (published by the gateway):
     {prefix}/nodes/{deviceId}/commands    {v, commandId, type, params, ts}
+    types include: access_result, mode ({mode, color?}), rgb ({color}), unlock, display, buzzer, alert, maintenance, time_sync
 
 `ts` is the node clock in epoch seconds. A reading `value` may be null when the
 sensor produced no measurement (for example, an ultrasonic sensor without echo).
 """
 
 import json
+from datetime import datetime
 
 from marshmallow import EXCLUDE, Schema, ValidationError, fields, validate
 
@@ -57,16 +59,32 @@ def parse_topic(prefix: str, topic: str) -> tuple[str, str]:
     return parts[-2], parts[-1]
 
 
+def parse_ts(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        iso_str = value
+        if iso_str.endswith("Z") or iso_str.endswith("z"):
+            iso_str = iso_str[:-1] + "+00:00"
+        return datetime.fromisoformat(iso_str).timestamp()
+    raise ValueError(f"Cannot parse timestamp from {value!r}")
+
+
 class _Message(Schema):
     class Meta:
         unknown = EXCLUDE
 
-    v = fields.Integer(required=True)
-    deviceId = fields.String(required=True, validate=validate.Length(min=1, max=64))
-    ts = fields.Float(required=True)
+    v = fields.Raw(required=True)
+    deviceId = fields.String(
+        load_default=None, allow_none=True, validate=validate.Length(min=1, max=64)
+    )
+    ts = fields.Raw(required=True, allow_none=True)
 
 
 class HeartbeatSchema(_Message):
+    deviceId = fields.String(required=True, validate=validate.Length(min=1, max=64))
     fw = fields.String(load_default=None, allow_none=True)
 
 
@@ -78,14 +96,16 @@ class AccessSchema(_Message):
 
 
 class ReadingSchema(_Message):
-    sensor = fields.String(required=True, validate=validate.OneOf(["humidity", "ultrasonic"]))
+    sensor = fields.String(
+        required=True, validate=validate.OneOf(["humidity", "ultrasonic", "temperature"])
+    )
     value = fields.Float(required=True, allow_none=True)
     unit = fields.String(load_default="")
 
 
 class AckSchema(_Message):
     commandId = fields.String(required=True)
-    status = fields.String(required=True, validate=validate.OneOf(["OK", "FAILED"]))
+    status = fields.String(required=True, validate=validate.OneOf(["OK", "FAILED", "ERROR"]))
     detail = fields.String(load_default=None, allow_none=True)
 
 
@@ -106,20 +126,41 @@ def parse_message(prefix: str, topic: str, raw: bytes | str) -> tuple[str, str, 
         raise ContractError("invalid_json", "Payload is not valid JSON", device_id) from exc
     if not isinstance(body, dict):
         raise ContractError("invalid_payload", "Payload must be a JSON object", device_id)
-    if body.get("v") != SCHEMA_VERSION:
+    raw_v = body.get("v")
+    if raw_v != SCHEMA_VERSION and raw_v != str(SCHEMA_VERSION):
         raise ContractError(
             "unsupported_version",
-            f"Unsupported schema version: {body.get('v')!r}",
+            f"Unsupported schema version: {raw_v!r}",
             device_id,
         )
     try:
         data = SCHEMAS[channel].load(body)
     except ValidationError as exc:
         raise ContractError("invalid_payload", json.dumps(exc.messages), device_id) from exc
-    if data["deviceId"] != device_id:
+
+    try:
+        data["ts"] = parse_ts(data["ts"])
+    except Exception as exc:
+        raise ContractError("invalid_payload", f"Invalid timestamp: {exc}", device_id) from exc
+
+    if not data.get("deviceId"):
+        data["deviceId"] = device_id
+    elif data["deviceId"] != device_id:
         raise ContractError(
             "device_mismatch",
             f"Payload deviceId {data['deviceId']!r} does not match topic {device_id!r}",
             device_id,
         )
+
+    if channel == "ack":
+        if data.get("status") == "ERROR":
+            data["status"] = "FAILED"
+        if data.get("detail") == "":
+            data["detail"] = None
+
+    if channel == "readings":
+        if data.get("unit") == "C":
+            data["unit"] = "°C"
+
+    data["v"] = SCHEMA_VERSION
     return device_id, channel, data

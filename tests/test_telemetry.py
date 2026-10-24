@@ -194,3 +194,27 @@ def test_api_calibrates_a_device_and_lists_readings(gw, node, client):
     everything = client.get("/api/v1/readings?includeInvalid=true", headers=AUTH).get_json()
     assert len(everything) == 2
     assert client.get("/api/v1/readings").status_code == 401
+
+
+# --- Task 7: temperature --------------------------------------------------------------
+def test_temperature_reading_is_forwarded(gw):
+    pfx = gw.config.mqtt_topic_prefix
+    gw.devices.register("esp32-acc-01", capabilities=["temperature"])
+    from .helpers import msg
+
+    topic, raw = msg(pfx, "esp32-acc-01", "readings", sensor="temperature", value=24.5, unit="°C")
+    assert gw.router.handle(topic, raw) is True
+    p = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "reading"][-1]
+    assert (p["sensor"], p["value"], p["unit"]) == ("temperature", 24.5, "°C")
+
+
+def test_temperature_out_of_range_is_invalid_and_three_raise_fault(gw):
+    pfx = gw.config.mqtt_topic_prefix
+    gw.devices.register("esp32-acc-01", capabilities=["temperature"])
+    from .helpers import msg
+
+    for _ in range(3):
+        topic, raw = msg(pfx, "esp32-acc-01", "readings", sensor="temperature", value=120.0, unit="°C")
+        gw.router.handle(topic, raw)
+    alerts = [json.loads(e.payload) for e in Outbox.select().order_by(Outbox.id) if e.kind == "alert"]
+    assert any(a.get("alert") == "sensor_fault_temperature" and a.get("state") == "raised" for a in alerts)

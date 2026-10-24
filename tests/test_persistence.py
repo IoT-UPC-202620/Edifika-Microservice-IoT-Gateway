@@ -82,3 +82,46 @@ def test_outbox_never_drops_critical_events_even_when_over_capacity(config):
         for i in range(4):
             gw.outbox.enqueue(ob.ACCESS_ATTEMPT, {"n": i})
         assert gw.outbox.pending_count() == 4
+
+
+def test_v010_database_is_migrated_in_place(tmp_path):
+    from peewee import SqliteDatabase
+    from edge_gateway.db import init_database
+    from edge_gateway.models import Device
+
+    db_path = str(tmp_path / "v010.db")
+    raw_db = SqliteDatabase(db_path)
+    raw_db.connect()
+    raw_db.execute_sql(
+        """
+        CREATE TABLE "device" (
+            "device_id" VARCHAR(255) NOT NULL PRIMARY KEY,
+            "area_id" VARCHAR(255),
+            "location" VARCHAR(255) NOT NULL,
+            "capabilities" TEXT NOT NULL,
+            "status" VARCHAR(255) NOT NULL,
+            "last_seen" DATETIME,
+            "firmware" VARCHAR(255),
+            "maintenance_since" DATETIME,
+            "maintenance_until" DATETIME,
+            "config" TEXT NOT NULL
+        )
+        """
+    )
+    raw_db.execute_sql(
+        """
+        INSERT INTO "device" ("device_id", "location", "capabilities", "status", "config")
+        VALUES ('esp32-old', 'lobby', '["rfid","lock"]', 'ACTIVE', '{}')
+        """
+    )
+    raw_db.close()
+
+    init_database(db_path)
+    with database.connection_context():
+        d = Device.get_by_id("esp32-old")
+        assert d.location == "lobby"
+        assert d.current_mode == "FREE_ACCESS"
+        assert d.managed == "local"
+        assert d.name == ""
+        assert d.led_color is None
+

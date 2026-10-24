@@ -1,30 +1,23 @@
-"""HTTP client for the cloud backend (Edge <-> Backend contract, see README)."""
+"""HTTP client for the IoT Access Management sync endpoint."""
 
 import logging
-
 import requests
+
+from .transport import CloudRejected, CloudUnavailable
 
 logger = logging.getLogger(__name__)
 
 
-class CloudUnavailable(Exception):
-    """The backend cannot be reached or answered with a transient error: retry later."""
-
-
-class CloudRejected(Exception):
-    """The backend refused the request (4xx): retrying the same payload will not help."""
-
-
-class CloudClient:
+class SyncClient:
     def __init__(self, config, session=None):
         self.config = config
-        self.base_url = config.cloud_base_url.rstrip("/")
+        self.base_url = config.sync_base_url.rstrip("/")
         self.session = session or requests.Session()
 
     def _headers(self) -> dict:
         headers = {"X-Gateway-Id": self.config.gateway_id}
-        if self.config.cloud_token:
-            headers["Authorization"] = f"Bearer {self.config.cloud_token}"
+        if self.config.sync_api_key:
+            headers["Authorization"] = f"Bearer {self.config.sync_api_key}"
         return headers
 
     def _request(self, method: str, path: str, **kwargs) -> dict:
@@ -47,18 +40,12 @@ class CloudClient:
         except ValueError as exc:
             raise CloudUnavailable("Backend returned invalid JSON") from exc
 
-    def post_events(self, events: list[dict]) -> list[str]:
-        """Deliver a batch. Returns the ids the backend accepted (idempotent by eventId)."""
-        body = self._request(
-            "POST",
-            "/api/v1/edge/events",
-            json={"gatewayId": self.config.gateway_id, "events": events},
-        )
-        accepted = body.get("accepted")
-        if accepted is None:  # a bare 2xx accepts the whole batch
-            return [e["eventId"] for e in events]
-        return list(accepted)
+    def fetch_sync(self, since: int | None = None) -> dict:
+        kwargs = {}
+        if since is not None:
+            kwargs["params"] = {"since": since}
+        return self._request("GET", "/api/v1/edge/sync", **kwargs)
 
-    def fetch_sync(self, since_version: int | None) -> dict:
-        params = {"since": since_version} if since_version is not None else {}
-        return self._request("GET", "/api/v1/edge/sync", params=params)
+
+# Backwards compatibility alias
+CloudClient = SyncClient

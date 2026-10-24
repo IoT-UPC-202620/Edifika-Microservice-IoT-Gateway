@@ -16,7 +16,7 @@ from edge_gateway.models import (
     Outbox,
     SyncState,
 )
-from edge_gateway.services.cloud import CloudClient, CloudRejected, CloudUnavailable
+from edge_gateway.services.cloud import CloudRejected, CloudUnavailable, SyncClient
 from edge_gateway.services.outbox import MAX_REJECTIONS
 from edge_gateway.services.sync import SyncSchema
 
@@ -199,42 +199,28 @@ class FakeSession:
 
 
 def make_client(response=None, error=None):
-    config = Config(service_token="x", cloud_base_url="http://cloud:9000/", cloud_token="secret", gateway_id="gw-7")
+    config = Config(service_token="x", sync_base_url="http://cloud:9000/", sync_api_key="secret", gateway_id="gw-7")
     session = FakeSession(response, error)
-    return CloudClient(config, session), session
-
-
-def test_client_posts_the_batch_with_gateway_identity_and_credentials():
-    client, session = make_client(FakeResponse(200, {"accepted": ["a"]}))
-    assert client.post_events([{"eventId": "a"}, {"eventId": "b"}]) == ["a"]
-    method, url, kwargs = session.requests[0]
-    assert (method, url) == ("POST", "http://cloud:9000/api/v1/edge/events")
-    assert kwargs["headers"]["Authorization"] == "Bearer secret" and kwargs["headers"]["X-Gateway-Id"] == "gw-7"
-    assert kwargs["json"]["gatewayId"] == "gw-7" and kwargs["timeout"] == 5.0
-
-
-def test_client_treats_a_bare_success_as_everything_accepted():
-    client, _ = make_client(FakeResponse(202, {}))
-    assert client.post_events([{"eventId": "a"}, {"eventId": "b"}]) == ["a", "b"]
+    return SyncClient(config, session), session
 
 
 @pytest.mark.parametrize("status", [500, 503, 401, 403, 429])
 def test_client_transient_failures_mean_retry_later(status):
     client, _ = make_client(FakeResponse(status, {}))
     with pytest.raises(CloudUnavailable):
-        client.post_events([{"eventId": "a"}])
+        client.fetch_sync(1)
 
 
 def test_client_other_4xx_are_permanent_rejections():
     client, _ = make_client(FakeResponse(422, {"error": "bad"}))
     with pytest.raises(CloudRejected):
-        client.post_events([{"eventId": "a"}])
+        client.fetch_sync(1)
 
 
 def test_client_network_errors_mean_retry_later():
     client, _ = make_client(error=requests.ConnectionError("down"))
     with pytest.raises(CloudUnavailable):
-        client.post_events([{"eventId": "a"}])
+        client.fetch_sync(1)
 
 
 def test_client_passes_the_cached_version_when_pulling():
@@ -242,7 +228,7 @@ def test_client_passes_the_cached_version_when_pulling():
     assert client.fetch_sync(2) == {"version": 3}
     assert session.requests[0][2]["params"] == {"since": 2}
     client.fetch_sync(None)
-    assert session.requests[1][2]["params"] == {}
+    assert session.requests[1][2].get("params") in (None, {})
 
 
 # --- US81: synchronisation ---------------------------------------------------------------

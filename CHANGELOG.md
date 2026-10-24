@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-10-24
+
+### Added
+- RabbitMQ integration via AMQP publisher with publisher confirms to `edifika.events` exchange (H1).
+- AMQP command consumer on queue `edge.<gateway_id>.commands` bound to `edifika.edge.commands` with DLX (H1).
+- Cloud order handling for `SyncRequested` and `DeviceCommandRequested` (`rgb`) with deduplication and state validation (H1).
+- Cloud devices and door reservations sync from IoT Access Management with schema migration (H1).
+- Door access role evaluation (`FREE_ACCESS` vs `RESERVED`) based on active reservations with offline mode switching (H1).
+- Temperature sensor telemetry support with out-of-range detection and fault alerts (H1).
+- Reference ESP32 firmware dialect support (`"v": "1"`, ISO timestamp with `Z`, optional `deviceId`) and door role recovery on reconnect (H1).
+- Door node simulator with mode state, RGB LED and temperature/humidity publishing (H1).
+- Real integration tests covering RabbitMQ event delivery <= 6s, 20-tap outage recovery, cloud order round-trip, and local access decisions < 500ms (H1).
+- Configurable endpoints with MQTT TLS, custom client ID, and legacy alias mapping (H1).
+
 ## [0.1.0] - 2026-10-02
 
 First working version of the Edge Gateway.

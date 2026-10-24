@@ -35,6 +35,7 @@ class Device(BaseModel, JsonMixin):
 
     device_id = CharField(primary_key=True)
     area_id = CharField(null=True)  # common area the node belongs to
+    name = CharField(default="")
     location = CharField(default="")
     capabilities = TextField(default="[]")  # JSON list: rfid, lock, buzzer, oled, humidity, ultrasonic
     status = CharField(default="INACTIVE")  # INACTIVE | ACTIVE | OFFLINE | MAINTENANCE
@@ -42,6 +43,9 @@ class Device(BaseModel, JsonMixin):
     firmware = CharField(null=True)
     maintenance_since = DateTimeField(null=True)
     maintenance_until = DateTimeField(null=True)
+    led_color = CharField(null=True)
+    managed = CharField(default="local")
+    current_mode = CharField(default="FREE_ACCESS")
     config = TextField(default="{}")  # JSON: calibration and thresholds
 
     @property
@@ -71,7 +75,18 @@ class AccessPermission(BaseModel):
 
     source_id = CharField(unique=True)  # reservation id in the cloud
     resident_id = CharField(index=True)
-    area_id = CharField(index=True)
+    area_id = CharField(null=True, index=True)
+    device_id = CharField(null=True, index=True)
+    starts_at = DateTimeField()
+    ends_at = DateTimeField()
+
+
+class DoorReservation(BaseModel):
+    """Reservation for a specific door node cached from the cloud."""
+
+    source_id = CharField(unique=True)
+    device_id = CharField(index=True)
+    holder_resident_id = CharField()
     starts_at = DateTimeField()
     ends_at = DateTimeField()
 
@@ -142,6 +157,7 @@ ALL_MODELS = [
     Device,
     Credential,
     AccessPermission,
+    DoorReservation,
     AreaSchedule,
     AccessAttempt,
     SensorReading,

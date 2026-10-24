@@ -10,7 +10,11 @@ from . import outbox as ob
 
 logger = logging.getLogger(__name__)
 
-VALID_RANGES = {"humidity": (0.0, 100.0), "ultrasonic": (2.0, 400.0)}  # %, cm
+VALID_RANGES = {
+    "humidity": (0.0, 100.0),
+    "ultrasonic": (2.0, 400.0),
+    "temperature": (-40.0, 85.0),
+}  # %, cm, °C
 CLOCK_TOLERANCE_S = 300
 
 DEFAULTS = {
@@ -80,7 +84,7 @@ class TelemetryService:
         )
         if sensor == "humidity":
             self._evaluate_humidity(device, value)
-        else:
+        elif sensor == "ultrasonic":
             self._evaluate_water_level(device, derived)
 
         payload = {
@@ -90,11 +94,10 @@ class TelemetryService:
             "value": value,
             "unit": unit,
             "capturedAt": to_iso(captured_at),
+            "timeSuspect": bool(suspect),
         }
         if derived is not None:
             payload["levelPct"] = round(derived, 1)
-        if suspect:
-            payload["timeSuspect"] = True
         self.outbox.enqueue(ob.READING, payload, occurred_at=captured_at)
 
     # --- validation ---------------------------------------------------------------
@@ -106,8 +109,10 @@ class TelemetryService:
         return low <= value <= high
 
     @staticmethod
-    def _captured_at(node_ts: float, now):
-        """Use the node timestamp unless its clock is far from the gateway's."""
+    def _captured_at(node_ts: float | None, now):
+        """Use the node timestamp unless its clock is far from the gateway's or null."""
+        if node_ts is None:
+            return now, True
         node_time = from_epoch(node_ts)
         if abs(to_epoch(now) - node_ts) <= CLOCK_TOLERANCE_S:
             return node_time, False

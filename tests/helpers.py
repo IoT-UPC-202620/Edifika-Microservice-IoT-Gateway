@@ -38,6 +38,22 @@ def msg(prefix, device_id, channel, **fields):
     return f"{prefix}/nodes/{device_id}/{channel}", json.dumps(body)
 
 
+def firmware_msg(prefix, device_id, channel, **fields):
+    body = {"v": "1"}
+    if "ts" in fields:
+        body["ts"] = fields.pop("ts")
+    else:
+        body["ts"] = "2026-10-24T15:04:05Z"
+
+    if channel == "heartbeat":
+        body["deviceId"] = fields.pop("deviceId", device_id)
+    elif "deviceId" in fields:
+        body["deviceId"] = fields.pop("deviceId")
+
+    body.update(fields)
+    return f"{prefix}/nodes/{device_id}/{channel}", json.dumps(body)
+
+
 class FakeCloud:
     """Stands in for the backend: records delivered events and serves a sync snapshot."""
 
@@ -51,7 +67,7 @@ class FakeCloud:
         self.sync_requests = []
 
     def post_events(self, events):
-        from edge_gateway.services.cloud import CloudRejected, CloudUnavailable
+        from edge_gateway.services.transport import CloudRejected, CloudUnavailable
 
         self.calls += 1
         if self.down:
@@ -64,7 +80,7 @@ class FakeCloud:
         return [e["eventId"] for e in accepted]
 
     def fetch_sync(self, since_version):
-        from edge_gateway.services.cloud import CloudUnavailable
+        from edge_gateway.services.transport import CloudUnavailable
 
         self.sync_requests.append(since_version)
         if self.down:
