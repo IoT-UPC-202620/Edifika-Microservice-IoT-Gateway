@@ -53,6 +53,7 @@ class Gateway:
         self.remote = RemoteCommandService(config, self.devices, self.commands, self.outbox)
         self.credentials = CredentialService(self.clock, self.outbox)
         self.access = AccessService(config, self.clock, self.devices, self.commands, self.outbox)
+        self.devices.access = self.access
         self.telemetry = TelemetryService(
             config, self.clock, self.devices, self.commands, self.outbox, self.alerts
         )

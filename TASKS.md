@@ -63,13 +63,13 @@
 - Métricas: 236 passed in < 15s
 - Bloqueos / notas: —
 
-## Task 7A — Dialecto del firmware de referencia (esp32) y recuperación del rol   [ ] pendiente
+## Task 7A — Dialecto del firmware de referencia (esp32) y recuperación del rol   [x] hecha
 - Rama: feature/H1-esp32-firmware-dialect
-- Paso actual: —
-- Archivos tocados: —
-- Tests: —
-- Último commit: —
-- Métricas: —
+- Paso actual: Step 5 — Commit and merge to develop
+- Archivos tocados: edge_gateway/gateway.py, edge_gateway/mqtt/contract.py, edge_gateway/services/access.py, edge_gateway/services/devices.py, edge_gateway/services/telemetry.py, tests/helpers.py, tests/test_firmware_dialect.py, TASKS.md
+- Tests: .venv/Scripts/python -m pytest -q → 243 passed
+- Último commit: feat(mqtt): accept the esp32 firmware envelope and resend the door mode on reconnect (H1)
+- Métricas: 243 passed in < 20s
 - Bloqueos / notas: —
 
 ## Task 8 — Simulador del nodo de puerta   [ ] pendiente

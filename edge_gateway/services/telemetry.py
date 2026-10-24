@@ -109,8 +109,10 @@ class TelemetryService:
         return low <= value <= high
 
     @staticmethod
-    def _captured_at(node_ts: float, now):
-        """Use the node timestamp unless its clock is far from the gateway's."""
+    def _captured_at(node_ts: float | None, now):
+        """Use the node timestamp unless its clock is far from the gateway's or null."""
+        if node_ts is None:
+            return now, True
         node_time = from_epoch(node_ts)
         if abs(to_epoch(now) - node_ts) <= CLOCK_TOLERANCE_S:
             return node_time, False

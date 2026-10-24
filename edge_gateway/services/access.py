@@ -127,6 +127,20 @@ class AccessService:
         )
         return "RESERVED" if has_res else "FREE_ACCESS"
 
+    def resend_mode(self, device: Device) -> None:
+        now = self.clock.now()
+        mode = self.current_mode(device, now)
+        if mode == "RESERVED":
+            params = {"mode": "RESERVED"}
+            if device.led_color is not None:
+                params["color"] = device.led_color
+        else:
+            params = {"mode": "FREE_ACCESS"}
+        try:
+            self.commands.send(device.device_id, "mode", params)
+        except Exception:
+            logger.exception("Could not resend mode to node %s", device.device_id)
+
     def check_mode_changes(self, now=None) -> list[str]:
         now = now or self.clock.now()
         changed = []

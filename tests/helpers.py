@@ -38,6 +38,22 @@ def msg(prefix, device_id, channel, **fields):
     return f"{prefix}/nodes/{device_id}/{channel}", json.dumps(body)
 
 
+def firmware_msg(prefix, device_id, channel, **fields):
+    body = {"v": "1"}
+    if "ts" in fields:
+        body["ts"] = fields.pop("ts")
+    else:
+        body["ts"] = "2026-10-24T15:04:05Z"
+
+    if channel == "heartbeat":
+        body["deviceId"] = fields.pop("deviceId", device_id)
+    elif "deviceId" in fields:
+        body["deviceId"] = fields.pop("deviceId")
+
+    body.update(fields)
+    return f"{prefix}/nodes/{device_id}/{channel}", json.dumps(body)
+
+
 class FakeCloud:
     """Stands in for the backend: records delivered events and serves a sync snapshot."""
 

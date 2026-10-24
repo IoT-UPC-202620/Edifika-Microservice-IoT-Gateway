@@ -31,12 +31,13 @@ MAINTENANCE = "MAINTENANCE"
 
 
 class DeviceService:
-    def __init__(self, config, clock, commands, outbox, alerts):
+    def __init__(self, config, clock, commands, outbox, alerts, access=None):
         self.config = config
         self.clock = clock
         self.commands = commands
         self.outbox = outbox
         self.alerts = alerts
+        self.access = access
         self._last_time_sync: dict[str, object] = {}
 
     # --- registry -----------------------------------------------------------------
@@ -112,6 +113,8 @@ class DeviceService:
                 {"deviceId": device.device_id, "event": "online"},
                 occurred_at=now,
             )
+            if previous_status == OFFLINE and "lock" in device.capability_list and self.access is not None:
+                self.access.resend_mode(device)
         if device.status == ACTIVE:
             self.alerts.clear_alert(device.device_id, "device_offline")
         self.alerts.clear_alert(device.device_id, "firmware_incompatible")
@@ -131,7 +134,8 @@ class DeviceService:
             )
         self.touch(device)
         if device.status != MAINTENANCE:
-            self._sync_clock_if_drifted(device, data["ts"])
+            if data.get("ts") is not None:
+                self._sync_clock_if_drifted(device, data["ts"])
 
     def check_offline(self, now=None) -> list[str]:
         """Mark silent nodes OFFLINE. Returns the ids that changed state."""
