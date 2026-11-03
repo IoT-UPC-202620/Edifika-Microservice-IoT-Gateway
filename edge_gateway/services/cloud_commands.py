@@ -81,32 +81,64 @@ class CloudCommandHandler:
                 self._report(device_code, command_id, type_, "FAILED", "unknown device")
                 return
 
-            # 4. Unsupported command type
+            # 4. Enrollment mode (card registration) has its own validation
+            if type_ in ("enroll", "ENROLL"):
+                self._handle_enroll(device, command_id, type_, params)
+                return
+
+            # 5. Unsupported command type
             if type_ not in ("rgb", "set_led", "SET_LED"):
                 self._report(device_code, command_id, type_, "FAILED", "unsupported command")
                 return
 
-            # 5. Invalid color
+            # 6. Invalid color
             color = params.get("color") if isinstance(params, dict) else None
             if not color or not isinstance(color, str) or not COLOR_RE.match(color):
                 self._report(device_code, command_id, type_, "FAILED", "invalid color")
                 return
             color = color.upper()
 
-            # 6. Door mode is not RESERVED
+            # 7. Door mode is not RESERVED
             current_mode = self.access.current_mode(device, now)
             if current_mode != "RESERVED":
                 self._report(device_code, command_id, type_, "FAILED", "door is not reserved")
                 return
 
-            # 7. Device status offline, maintenance or inactive
+            # 8. Device status offline, maintenance or inactive
             if device.status in ("OFFLINE", "MAINTENANCE", "INACTIVE"):
                 self._report(device_code, command_id, type_, "FAILED", "device unavailable")
                 return
 
-            # 8. All checks pass
+            # 9. All checks pass
             device.led_color = color
             device.save()
             self.commands.send(
                 device_code, "rgb", {"color": color}, command_id=command_id, report=True
             )
+
+    MAX_ENROLL_SECONDS = 300
+
+    def _handle_enroll(self, device, command_id: str, type_: str, params) -> None:
+        """Put a reader in (or take it out of) card enrollment mode.
+
+        While active, the node reports the next card on the `enrollment` channel instead
+        of evaluating it as an access attempt.
+        """
+        device_code = device.device_id
+        if not isinstance(params, dict) or not isinstance(params.get("active"), bool):
+            self._report(device_code, command_id, type_, "FAILED", "invalid params")
+            return
+        active = params["active"]
+        if active:
+            seconds = params.get("seconds", 60)
+            if isinstance(seconds, bool) or not isinstance(seconds, int) or not 1 <= seconds <= self.MAX_ENROLL_SECONDS:
+                self._report(device_code, command_id, type_, "FAILED", "invalid seconds")
+                return
+            if device.status in ("OFFLINE", "INACTIVE", "MAINTENANCE"):
+                self._report(device_code, command_id, type_, "FAILED", "device unavailable")
+                return
+            node_params = {"active": True, "seconds": seconds}
+        else:
+            # Leaving enrollment mode is always forwarded: it can only make the reader safer.
+            node_params = {"active": False}
+        self.commands.send(device_code, "enroll", node_params, command_id=command_id, report=True)
