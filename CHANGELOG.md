@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Card enrollment: new MQTT channel `enrollment`; a card read there is forwarded to the cloud as `card_enrolled` (`CardEnrolled`, routing key `edge.card-enrolled`) without deciding access or storing an attempt.
+- Cloud `DeviceCommandRequested` orders of type `enroll` are validated (`active` boolean, `seconds` 1..300, device available when activating) and forwarded to the node.
+
 ## [0.3.0] - 2026-10-24
 
 ### Added
