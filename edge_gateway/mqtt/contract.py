@@ -5,10 +5,13 @@ Node -> Gateway (published by the firmware):
     {prefix}/nodes/{deviceId}/access      {v, deviceId, ts, credentialType, credential}
     {prefix}/nodes/{deviceId}/readings    {v, deviceId, ts, sensor, value, unit}
     {prefix}/nodes/{deviceId}/ack         {v, deviceId, commandId, status, ts, detail?}
+    {prefix}/nodes/{deviceId}/enrollment  {v, deviceId, ts, credentialType, credential}
+        card read while the node is in enrollment mode: it is NOT an access attempt
 
 Gateway -> Node (published by the gateway):
     {prefix}/nodes/{deviceId}/commands    {v, commandId, type, params, ts}
-    types include: access_result, mode ({mode, color?}), rgb ({color}), unlock, display, buzzer, alert, maintenance, time_sync
+    types include: access_result, mode ({mode, color?}), rgb ({color}), unlock, display, buzzer, alert, maintenance, time_sync,
+    enroll ({active, seconds?}: enrollment mode, the next card is reported on `enrollment`)
 
 `ts` is the node clock in epoch seconds. A reading `value` may be null when the
 sensor produced no measurement (for example, an ultrasonic sensor without echo).
@@ -20,7 +23,7 @@ from datetime import datetime
 from marshmallow import EXCLUDE, Schema, ValidationError, fields, validate
 
 SCHEMA_VERSION = 1
-CHANNELS = ("heartbeat", "access", "readings", "ack")
+CHANNELS = ("heartbeat", "access", "readings", "ack", "enrollment")
 
 
 class ContractError(Exception):
@@ -114,11 +117,19 @@ class AckSchema(_Message):
     detail = fields.String(load_default=None, allow_none=True)
 
 
+class EnrollmentSchema(_Message):
+    """Card captured in enrollment mode. Same shape as an access read, other meaning."""
+
+    credentialType = fields.String(load_default="RFID", validate=validate.OneOf(["RFID"]))
+    credential = fields.String(required=True, validate=validate.Length(min=1, max=128))
+
+
 SCHEMAS = {
     "heartbeat": HeartbeatSchema(),
     "access": AccessSchema(),
     "readings": ReadingSchema(),
     "ack": AckSchema(),
+    "enrollment": EnrollmentSchema(),
 }
 
 
