@@ -66,6 +66,7 @@ class Gateway:
         self.router.register("readings", self.telemetry.on_reading)
         self.router.register("ack", self.commands.handle_ack)
         self.router.register("enrollment", self.access.on_enrollment)
+        self.router.register("announce", self.devices.on_announce)
 
         self.command_consumer = None
         if config.amqp_url:

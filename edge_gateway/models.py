@@ -57,6 +57,26 @@ class Device(BaseModel, JsonMixin):
         return self._load(self.config, {})
 
 
+class DiscoveredDevice(BaseModel, JsonMixin):
+    """A node that announced itself but is not registered yet: pending adoption and inert."""
+
+    device_id = CharField(primary_key=True)
+    mac = CharField()
+    firmware = CharField()
+    model = CharField(null=True)
+    capabilities = TextField(default="[]")  # JSON list, as announced (RFID, LOCK, ...)
+    ip = CharField(null=True)
+    rssi = IntegerField(null=True)
+    pairing_code = CharField()
+    first_seen = DateTimeField()
+    last_seen = DateTimeField()
+    reported_at = DateTimeField(null=True)  # last DeviceDiscovered sent to the cloud
+
+    @property
+    def capability_list(self) -> list:
+        return self._load(self.capabilities, [])
+
+
 class Credential(BaseModel):
     """Access credential cached from the cloud (RFID card or mobile token id)."""
 
@@ -155,6 +175,7 @@ class SyncState(BaseModel):
 
 ALL_MODELS = [
     Device,
+    DiscoveredDevice,
     Credential,
     AccessPermission,
     DoorReservation,

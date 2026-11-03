@@ -5,7 +5,7 @@ import logging
 from datetime import timedelta
 
 from ..clock import from_epoch, to_epoch, to_iso
-from ..models import Device
+from ..models import Device, DiscoveredDevice
 from . import outbox as ob
 from .errors import ConflictError, NotFoundError, ValidationFailed
 
@@ -23,6 +23,9 @@ CAPABILITIES = {
     "temperature",
 }
 TIME_SYNC_COOLDOWN_S = 30
+# A pending node is re-reported at least this often while it keeps announcing itself,
+# so the cloud can tell a board that is still there from one that was unplugged.
+DISCOVERY_REPORT_INTERVAL_S = 300
 
 ACTIVE = "ACTIVE"
 INACTIVE = "INACTIVE"
@@ -91,12 +94,86 @@ class DeviceService:
         return list(Device.select().order_by(Device.device_id))
 
     def known_device(self, device_id: str) -> Device | None:
-        """Look up the sender of an MQTT message; unknown senders are reported once and ignored."""
+        """Look up the sender of an MQTT message; unknown senders are ignored.
+
+        A node waiting for adoption is expected to be inert, so its messages are dropped
+        quietly; any other unknown sender raises `unregistered_device` once.
+        """
         device = self.get(device_id)
         if device is None:
-            logger.warning("Ignoring message from unregistered device %s", device_id)
-            self.alerts.raise_alert(device_id, "unregistered_device")
+            if DiscoveredDevice.get_or_none(DiscoveredDevice.device_id == device_id) is not None:
+                logger.debug("Ignoring message from %s: pending adoption", device_id)
+            else:
+                logger.warning("Ignoring message from unregistered device %s", device_id)
+                self.alerts.raise_alert(device_id, "unregistered_device")
         return device
+
+    # --- discovery ----------------------------------------------------------------
+    def discovered(self, device_id: str) -> DiscoveredDevice | None:
+        return DiscoveredDevice.get_or_none(DiscoveredDevice.device_id == device_id)
+
+    def on_announce(self, device_id: str, data: dict) -> None:
+        """A node introduced itself.
+
+        A registered node gets its configuration back at once (`mode`), which is also its
+        signal that it is adopted. An unknown node is kept as pending: it stays inert and
+        is reported to the cloud as DeviceDiscovered, in this gateway's building.
+        """
+        device = self.get(device_id)
+        if device is not None:
+            DiscoveredDevice.delete().where(DiscoveredDevice.device_id == device_id).execute()
+            self._record_firmware(device, data.get("fw"))
+            previous_status = device.status
+            self.touch(device)  # coming back from OFFLINE/INACTIVE already re-sends `mode`
+            already_sent = previous_status in (OFFLINE, INACTIVE)
+            if (not already_sent and device.status != MAINTENANCE
+                    and "lock" in device.capability_list and self.access is not None):
+                self.access.resend_mode(device)
+            return
+
+        now = self.clock.now()
+        snapshot = {
+            "mac": data["mac"].upper(),
+            "firmware": data["fw"],
+            "model": data.get("model"),
+            "capabilities": json.dumps(sorted(set(data["capabilities"]))),
+            "ip": data.get("ip"),
+            "rssi": data.get("rssi"),
+            "pairing_code": data["pairingCode"],
+        }
+        pending = self.discovered(device_id)
+        if pending is None:
+            pending = DiscoveredDevice.create(device_id=device_id, first_seen=now, last_seen=now, **snapshot)
+            changed = True
+            logger.info("Discovered node %s (code %s)", device_id, pending.pairing_code)
+        else:
+            changed = any(getattr(pending, key) != value for key, value in snapshot.items() if key != "rssi")
+            for key, value in snapshot.items():
+                setattr(pending, key, value)
+            pending.last_seen = now
+        due = pending.reported_at is None or now - pending.reported_at >= timedelta(seconds=DISCOVERY_REPORT_INTERVAL_S)
+        if changed or due:
+            pending.reported_at = now
+            self.outbox.enqueue(ob.DEVICE_DISCOVERED, self._discovery_payload(pending), occurred_at=now)
+        pending.save()
+
+    def list_discovered(self) -> list[DiscoveredDevice]:
+        return list(DiscoveredDevice.select().order_by(DiscoveredDevice.last_seen.desc()))
+
+    @staticmethod
+    def _discovery_payload(pending: DiscoveredDevice) -> dict:
+        return {
+            "deviceCode": pending.device_id,
+            "mac": pending.mac,
+            "firmware": pending.firmware,
+            "model": pending.model,
+            "capabilities": pending.capability_list,
+            "ip": pending.ip,
+            "rssi": pending.rssi,
+            "pairingCode": pending.pairing_code,
+            "firstSeenAt": to_iso(pending.first_seen),
+            "lastSeenAt": to_iso(pending.last_seen),
+        }
 
     # --- liveness -----------------------------------------------------------------
     def touch(self, device: Device) -> Device:
@@ -113,25 +190,31 @@ class DeviceService:
                 {"deviceId": device.device_id, "event": "online"},
                 occurred_at=now,
             )
-            if previous_status == OFFLINE and "lock" in device.capability_list and self.access is not None:
+            # INACTIVE -> ACTIVE is also the first heartbeat after adoption: the node is still
+            # waiting for its first `mode` to leave the unregistered state
+            if "lock" in device.capability_list and self.access is not None:
                 self.access.resend_mode(device)
+            if previous_status == INACTIVE:
+                DiscoveredDevice.delete().where(DiscoveredDevice.device_id == device.device_id).execute()
         if device.status == ACTIVE:
             self.alerts.clear_alert(device.device_id, "device_offline")
         self.alerts.clear_alert(device.device_id, "firmware_incompatible")
         return device
 
-    def on_heartbeat(self, device_id: str, data: dict) -> None:
-        device = self.known_device(device_id)
-        if device is None:
-            return
-        fw = data.get("fw")
+    def _record_firmware(self, device: Device, fw: str | None) -> None:
         if fw and fw != device.firmware:
             device.firmware = fw
             self.outbox.enqueue(
                 ob.DEVICE_STATUS,
-                {"deviceId": device_id, "event": "firmware", "firmware": fw},
+                {"deviceId": device.device_id, "event": "firmware", "firmware": fw},
                 occurred_at=self.clock.now(),
             )
+
+    def on_heartbeat(self, device_id: str, data: dict) -> None:
+        device = self.known_device(device_id)
+        if device is None:
+            return
+        self._record_firmware(device, data.get("fw"))
         self.touch(device)
         if device.status != MAINTENANCE and "lock" in device.capability_list and self.access is not None:
             self.access.reconcile_mode(device, data.get("mode"), data.get("color"))

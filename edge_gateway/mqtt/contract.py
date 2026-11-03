@@ -7,11 +7,14 @@ Node -> Gateway (published by the firmware):
     {prefix}/nodes/{deviceId}/ack         {v, deviceId, commandId, status, ts, detail?}
     {prefix}/nodes/{deviceId}/enrollment  {v, deviceId, ts, credentialType, credential}
         card read while the node is in enrollment mode: it is NOT an access attempt
+    {prefix}/nodes/{deviceId}/announce    {v, deviceId, ts, mac, fw, model, capabilities, ip, rssi, pairingCode}
+        the node introduces itself; an unregistered node stays pending (and inert) until adopted
 
 Gateway -> Node (published by the gateway):
     {prefix}/nodes/{deviceId}/commands    {v, commandId, type, params, ts}
     types include: access_result, mode ({mode, color?}), rgb ({color}), unlock, display, buzzer, alert, maintenance, time_sync,
-    enroll ({active, seconds?}: enrollment mode, the next card is reported on `enrollment`)
+    enroll ({active, seconds?}: enrollment mode, the next card is reported on `enrollment`),
+    identify ({seconds?}: blink and beep; the only command sent to a node that is not adopted)
 
 `ts` is the node clock in epoch seconds. A reading `value` may be null when the
 sensor produced no measurement (for example, an ultrasonic sensor without echo).
@@ -23,7 +26,7 @@ from datetime import datetime
 from marshmallow import EXCLUDE, Schema, ValidationError, fields, validate
 
 SCHEMA_VERSION = 1
-CHANNELS = ("heartbeat", "access", "readings", "ack", "enrollment")
+CHANNELS = ("heartbeat", "access", "readings", "ack", "enrollment", "announce")
 
 
 class ContractError(Exception):
@@ -124,12 +127,31 @@ class EnrollmentSchema(_Message):
     credential = fields.String(required=True, validate=validate.Length(min=1, max=128))
 
 
+CAPABILITY_NAMES = ["RFID", "LOCK", "BUZZER", "OLED", "RGB_LED", "TEMPERATURE", "HUMIDITY"]
+
+
+class AnnounceSchema(_Message):
+    """A node introducing itself: identity, firmware and what it can do."""
+
+    deviceId = fields.String(required=True, validate=validate.Length(min=1, max=64))
+    mac = fields.String(
+        required=True, validate=validate.Regexp(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", error="Expected AA:BB:CC:DD:EE:FF")
+    )
+    fw = fields.String(required=True, validate=validate.Length(min=1, max=32))
+    model = fields.String(load_default=None, allow_none=True, validate=validate.Length(max=64))
+    capabilities = fields.List(fields.String(validate=validate.OneOf(CAPABILITY_NAMES)), required=True)
+    ip = fields.String(load_default=None, allow_none=True, validate=validate.Length(max=45))
+    rssi = fields.Integer(load_default=None, allow_none=True)
+    pairingCode = fields.String(required=True, validate=validate.Regexp(r"^[0-9]{4}$", error="Expected 4 digits"))
+
+
 SCHEMAS = {
     "heartbeat": HeartbeatSchema(),
     "access": AccessSchema(),
     "readings": ReadingSchema(),
     "ack": AckSchema(),
     "enrollment": EnrollmentSchema(),
+    "announce": AnnounceSchema(),
 }
 
 

@@ -37,6 +37,11 @@ def events(kind=None):
 def alive(gw, device_id="door-1", capabilities=("rfid", "lock", "oled", "buzzer")):
     device = gw.devices.register(device_id, area_id="pool", capabilities=list(capabilities))
     gw.devices.touch(device)
+    # The first heartbeat of a registered door sends its `mode`; each test starts without it
+    gw.commands.pending.discard_device(device_id)
+    target = getattr(gw.publisher, "target", gw.publisher)
+    if hasattr(target, "sent"):
+        target.sent.clear()
     Outbox.delete().execute()
     return device
 
