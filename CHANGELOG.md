@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Device discovery: an unregistered node that publishes `announce` is kept as pending (`DiscoveredDevice`) and reported to the cloud as `DeviceDiscovered` when first seen, when its data changes and at least every 5 minutes. A pending node is inert: its other messages are dropped without raising `unregistered_device`.
+- Cloud `identify` orders reach registered and pending nodes; it is the only command a pending node receives.
+- A registered node that announces itself gets its `mode` back at once, and the first heartbeat after adoption (INACTIVE -> ACTIVE) sends `mode` too, which is the node's signal that it was adopted.
 - Card enrollment: new MQTT channel `enrollment`; a card read there is forwarded to the cloud as `card_enrolled` (`CardEnrolled`, routing key `edge.card-enrolled`) without deciding access or storing an attempt.
 - Cloud `DeviceCommandRequested` orders of type `enroll` are validated (`active` boolean, `seconds` 1..300, device available when activating) and forwarded to the node.
 
