@@ -17,6 +17,7 @@ DEVICE_STATUS = "device_status"
 COMMAND_RESULT = "command_result"
 CREDENTIAL_CHANGED = "credential_changed"
 CARD_ENROLLED = "card_enrolled"
+DEVICE_DISCOVERED = "device_discovered"
 
 # Telemetry is the first thing dropped when the queue is full.
 DISPOSABLE_KINDS = (READING,)
