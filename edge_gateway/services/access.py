@@ -115,6 +115,30 @@ class AccessService:
         self._detect_repeated_denials(device_id, uid, now)
         self._answer_node(device, result, reason, credential)
 
+    def on_enrollment(self, device_id: str, data: dict) -> None:
+        """A card read while the node was in enrollment mode.
+
+        It is not an access attempt: nothing is decided, no attempt is stored and the
+        door stays closed. The UID goes to the cloud, which assigns it to the open
+        enrollment session of this reader.
+        """
+        device = self.devices.known_device(device_id)
+        if device is None:
+            return
+        self.devices.touch(device)
+        uid = normalize_uid(data["credential"])
+        self.outbox.enqueue(
+            ob.CARD_ENROLLED,
+            {
+                "deviceId": device_id,
+                "deviceCode": device_id,
+                "uid": uid,
+                "credentialType": data["credentialType"],
+            },
+            occurred_at=self.clock.now(),
+        )
+        logger.info("Card %s captured in enrollment mode on %s", mask(uid), device_id)
+
     def current_mode(self, device, now=None) -> str:
         now = now or self.clock.now()
         has_res = (
