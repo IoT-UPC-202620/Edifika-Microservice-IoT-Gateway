@@ -75,41 +75,46 @@ class CloudCommandHandler:
                     self._report(device_code, command_id, type_, "EXPIRED", None)
                     return
 
-            # 3. Unknown device
+            # 3. Identify reaches registered nodes and nodes pending adoption alike
+            if type_ in ("identify", "IDENTIFY"):
+                self._handle_identify(device_code, command_id, type_, params)
+                return
+
+            # 4. Unknown device
             device = self.devices.get(device_code)
             if device is None:
                 self._report(device_code, command_id, type_, "FAILED", "unknown device")
                 return
 
-            # 4. Enrollment mode (card registration) has its own validation
+            # 5. Enrollment mode (card registration) has its own validation
             if type_ in ("enroll", "ENROLL"):
                 self._handle_enroll(device, command_id, type_, params)
                 return
 
-            # 5. Unsupported command type
+            # 6. Unsupported command type
             if type_ not in ("rgb", "set_led", "SET_LED"):
                 self._report(device_code, command_id, type_, "FAILED", "unsupported command")
                 return
 
-            # 6. Invalid color
+            # 7. Invalid color
             color = params.get("color") if isinstance(params, dict) else None
             if not color or not isinstance(color, str) or not COLOR_RE.match(color):
                 self._report(device_code, command_id, type_, "FAILED", "invalid color")
                 return
             color = color.upper()
 
-            # 7. Door mode is not RESERVED
+            # 8. Door mode is not RESERVED
             current_mode = self.access.current_mode(device, now)
             if current_mode != "RESERVED":
                 self._report(device_code, command_id, type_, "FAILED", "door is not reserved")
                 return
 
-            # 8. Device status offline, maintenance or inactive
+            # 9. Device status offline, maintenance or inactive
             if device.status in ("OFFLINE", "MAINTENANCE", "INACTIVE"):
                 self._report(device_code, command_id, type_, "FAILED", "device unavailable")
                 return
 
-            # 9. All checks pass
+            # 10. All checks pass
             device.led_color = color
             device.save()
             self.commands.send(
@@ -117,6 +122,22 @@ class CloudCommandHandler:
             )
 
     MAX_ENROLL_SECONDS = 300
+    MAX_IDENTIFY_SECONDS = 60
+
+    def _handle_identify(self, device_code: str, command_id: str, type_: str, params) -> None:
+        """Make a board blink and beep so the admin can spot it.
+
+        It is the only command a node pending adoption receives: it changes nothing on the
+        node and lets the admin match the physical board before adopting it.
+        """
+        if self.devices.get(device_code) is None and self.devices.discovered(device_code) is None:
+            self._report(device_code, command_id, type_, "FAILED", "unknown device")
+            return
+        seconds = params.get("seconds", 10) if isinstance(params, dict) else 10
+        if isinstance(seconds, bool) or not isinstance(seconds, int) or not 1 <= seconds <= self.MAX_IDENTIFY_SECONDS:
+            self._report(device_code, command_id, type_, "FAILED", "invalid seconds")
+            return
+        self.commands.send(device_code, "identify", {"seconds": seconds}, command_id=command_id, report=True)
 
     def _handle_enroll(self, device, command_id: str, type_: str, params) -> None:
         """Put a reader in (or take it out of) card enrollment mode.
